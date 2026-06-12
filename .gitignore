@@ -1,0 +1,16 @@
+SAELens-main/
+SAEBench-main/
+matryoshka-sae/
+76_Evaluating_Sparse_Autoencod_Code/
+**/*.pt
+**/*.err
+**/*.err
+reference_code/
+.vscode/
+Summer 2026/
+*_acts_*/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
