@@ -10,7 +10,7 @@ for i in range(num_files):
     Z_mean = Z.float().mean(dim=0)  # (p)
     print(Z.shape)
     print(Z_mean.shape)
-    expectation_values_list.append(mean)
+    expectation_values_list.append(Z_mean)
     
     Z_active = Z.float()
     Z_active[Z_active == 0] = float('nan')
