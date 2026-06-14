@@ -13,7 +13,8 @@ Gram_test = (Z[:,:16].float().T@Z[:,:16].float()).numpy()
 np.fill_diagonal(Gram_test, np.nan)
 
 plt.figure()
-heatmap = sns.heatmap(Gram_test,cmap='RdBu')
+vmax = np.nanpercentile(Gram_test, 99)
+heatmap = sns.heatmap(Gram_test,cmap='Reds',vmin=0,vmax=vmax)
 heatmap.set(xlabel='feature i', ylabel='feature j')
 
 plt.savefig(f'gram_heatmap_{now:%Y%m%d%H%M%S}.png')

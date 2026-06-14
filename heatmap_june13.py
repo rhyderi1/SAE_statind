@@ -12,7 +12,8 @@ torch.save(gram_1,f'gram_1_{now:%Y%m%d%H%M%S}.pt')
 
 np.fill_diagonal(gram_1.numpy(),np.nan)
 plt.figure()
-heatmap = sns.heatmap(gram_1,cmap='RdBu')
+vmax = np.nanpercentile(gram_1, 99)
+heatmap = sns.heatmap(gram_1,cmap='Reds',vmin=0,vmax=vmax)
 heatmap.set(xlabel='feature i', ylabel='feature j')
 plt.savefig(f'gram_1_heatmap_{now:%Y%m%d%H%M%S}.png')
 
@@ -28,6 +29,7 @@ torch.save(gram_matrix,f'gram_matrix_{now:%Y%m%d%H%M%S}.pt')
 
 np.fill_diagonal(gram_matrix.numpy(),np.nan)
 plt.figure()
-heatmap = sns.heatmap(gram_matrix,cmap='RdBu')
+vmax = np.nanpercentile(gram_matrix, 99)
+heatmap = sns.heatmap(gram_matrix,cmap='Reds',vmin=0,vmax=vmax)
 heatmap.set(xlabel='feature i', ylabel='feature j')
 plt.savefig(f'gram_matrix_heatmap_{now:%Y%m%d%H%M%S}.png')

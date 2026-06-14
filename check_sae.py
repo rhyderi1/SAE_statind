@@ -70,8 +70,6 @@ from sae_lens import SAE
 # print(sae.cfg)
 
 
-from sae_lens import SAE
-
 release = "gemma-scope-2b-pt-res"
 sae_id = "layer_12/width_16k/average_l0_72"
 sae = SAE.from_pretrained(release, sae_id)
