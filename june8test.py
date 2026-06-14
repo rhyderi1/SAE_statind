@@ -1,6 +1,4 @@
-from datetime import datetime
-import matplotlib as plt
+import torch
 
-now = datetime.now()
-
-print(f'The datetime is {now:%Y%m%d%H%M%S}')
+Z = torch.load('1_acts_layer12_relu_20_20260610_132348/Z_shard022.pt')
+print(Z.dtype)
