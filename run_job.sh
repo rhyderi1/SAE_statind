@@ -2,8 +2,8 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=4:00:00
-#SBATCH --job-name=check_symmettry
+#SBATCH --time=1:00:00
+#SBATCH --job-name=DTD_ZTZ_scatter
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 export HF_TOKEN=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
@@ -13,4 +13,4 @@ source /project/aip-bahtol/rhyderi1/sae_statind/.venv/bin/activate
 
 cd /project/aip-bahtol/rhyderi1/sae_statind
 
-python june14btest.py
+python DTDxZTZ_scatter.py
