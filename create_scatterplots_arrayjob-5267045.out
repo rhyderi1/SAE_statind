@@ -1,0 +1,17 @@
+
+Loading model + SAE on cuda ...
+Loaded pretrained model gemma-2-2b into HookedTransformer
+Selected: layer=19, arch=matryoshka, sparsity=40
+  release = gemma-2-2b-res-matryoshka-dc
+  sae_id  = blocks.19.hook_resid_post
+
+Building ActivationsStore (dataset='NeelNanda/pile-10k', context_size=128) ...
+
+Collecting 13 batches of 32 x 128 tokens
+  hook: blocks.19.hook_resid_post  |  stop_at_layer: 20
+  shard_size: 50000 token positions
+
+  Saved june16outputs/layer19_matryoshka_l040_20260616_185809/X_shard000.pt  (53248, 2304)
+  Saved june16outputs/layer19_matryoshka_l040_20260616_185809/Z_shard000.pt  (53248, 32768)
+
+Done. Shards written to june16outputs/layer19_matryoshka_l040_20260616_185809/

@@ -3,11 +3,11 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=00:07:00
+#SBATCH --time=15:00:00
 #SBATCH --job-name=create_scatterplots_arrayjob
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
-#SBATCH --array=0-1%4
+#SBATCH --array=0-19%4
 
 module load python/3.11.5
 module load gcc arrow/24.0.0
@@ -21,9 +21,6 @@ export HF_TOKEN=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
 
 
 python infer_z.py \
-    --layer $LAYER \
-    --arch $ARCH \
-    --sparsity $SPARSITY \
     --modelchoice gemma-2-2b \
     --dtypechoice float32 \
     --n_batches 13 \
@@ -33,6 +30,5 @@ python infer_z.py \
     --store_x \
     --store_z \
     --plot \
-    --task_id $SLURM_ARRAY_TASK_ID \
-    --config_csv = configs.csv
+    --task_id $SLURM_ARRAY_TASK_ID 
 
