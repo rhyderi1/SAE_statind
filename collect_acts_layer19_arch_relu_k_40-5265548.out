@@ -1,8 +1,0 @@
-
-Loading model + SAE on cuda ...
-Loaded pretrained model gemma-2-2b into HookedTransformer
-Selected: layer=12, arch=relu, sparsity=20
-  release = sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109
-  sae_id  = blocks.12.hook_resid_post__trainer_0
-
-Building ActivationsStore (dataset='NeelNanda/pile-10k', context_size=128) ...
