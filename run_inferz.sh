@@ -3,10 +3,11 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=8:00:00
-#SBATCH --job-name=collect_acts_layer19_arch_relu_k_40
+#SBATCH --time=00:07:00
+#SBATCH --job-name=create_scatterplots_arrayjob
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
+#SBATCH --array=0-1%4
 
 module load python/3.11.5
 module load gcc arrow/24.0.0
@@ -16,11 +17,7 @@ cd /project/aip-bahtol/rhyderi1/sae_statind
 
 export HF_DATASETS_CACHE="/scratch/rhyderi1/hf_datasets"
 export HF_HOME="/scratch/rhyderi1/hf_home"
-
-# needed to save out_dir
-LAYER=19
-ARCH=relu
-SPARSITY=20
+export HF_TOKEN=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
 
 
 python infer_z.py \
@@ -28,12 +25,14 @@ python infer_z.py \
     --arch $ARCH \
     --sparsity $SPARSITY \
     --modelchoice gemma-2-2b \
-    --dtypechoice float16 \
-    --n_batches 1220 \
+    --dtypechoice float32 \
+    --n_batches 13 \
     --batch_size 32 \
     --context_size 128 \
-    --shard_size 10000 \
-    --out_dir "5_acts_small_layer${LAYER}_${ARCH}_${SPARSITY}_$(date +%Y%m%d_%H%M%S)" \
+    --shard_size 50000 \
+    --store_x \
     --store_z \
-    --store_x
+    --plot \
+    --task_id $SLURM_ARRAY_TASK_ID \
+    --config_csv = configs.csv
 

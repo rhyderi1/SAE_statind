@@ -8,6 +8,16 @@ from sae_lens.training.activations_store import ActivationsStore
 
 from transformer_lens import HookedTransformer
 import argparse
+import matplotlib
+matplotlib.use('Agg')  # Must precede pyplot import
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+from datetime import datetime
+import csv
+import time
+now = datetime.now()
+
 
 SAE_DATA = {
     12: {
@@ -53,14 +63,25 @@ SAE_DATA = {
     },
 }
 
+def read_config(task_id, file_path):
+    """Reads the config row for the given task ID ."""
+    with open(file_path, 'r') as file:
+        reader = csv.DictReader(file)
+        for i, row in enumerate(reader):
+            if i == task_id:
+                return row
+    return None
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--layer",        type=int, required=True, choices=[12, 19])
-    parser.add_argument("--arch",         type=str, required=True, choices=["relu", "topk", "batchtopk", "jumprelu", "matryoshka"])
-    parser.add_argument("--sparsity",     type=str, required=True)
+    parser.add_argument("--task_id",    type=int, default=None)
+    parser.add_argument("--config_csv", type=str, default="params.csv")
+    parser.add_argument("--layer",    type=int, choices=[12, 19])
+    parser.add_argument("--arch",     type=str, choices=["relu","topk","batchtopk","jumprelu","matryoshka"])
+    parser.add_argument("--sparsity", type=str)
     parser.add_argument("--modelchoice",  type=str, required=True, choices=["gemma-2-2b"])
-    parser.add_argument("--dtypechoice",  type=str, default="float16", choices=["float16", "float32"])
+    parser.add_argument("--dtypechoice",  type=str, default="float32", choices=["float16", "float32"])
     parser.add_argument("--dataset",      type=str, default="NeelNanda/pile-10k")
     parser.add_argument("--n_batches",    type=int, default=200)
     parser.add_argument("--batch_size",   type=int, default=32)
@@ -69,7 +90,9 @@ def parse_args():
     parser.add_argument("--shard_size",   type=int, default=50_000)
     parser.add_argument("--store_x",      action="store_true") #if the argument is present, set to True (required for Boolean)
     parser.add_argument("--store_z",      action="store_true")
+    parser.add_argument("--plot", action="store_true")
     return parser.parse_args()
+
 
 
 def get_sae(layer, arch, sparsity, device: str) -> SAE: # returns an object of class SAE (SAELens base architecture for all SAEs)
@@ -82,7 +105,7 @@ def get_sae(layer, arch, sparsity, device: str) -> SAE: # returns an object of c
     return sae.to(device).eval() # move to GPU, turns to evaluation mode (no dropout, batchnorm)
 
 
-def _save_shard(all_X, all_Z, out_dir, shard_idx, store_z, store_x):
+def _save_shard(all_X, all_Z, out_dir, shard_idx, store_x, store_z):
     if store_x and all_X:
         X_cat = torch.cat(all_X, dim=0) # concatenates the list of tensors (13 tensors for 13 batches, where each batch is (4096,2304)) into 1 tensor with dimension (53k, 2304)
         x_path = os.path.join(out_dir, f"X_shard{shard_idx:03d}.pt")
@@ -93,12 +116,46 @@ def _save_shard(all_X, all_Z, out_dir, shard_idx, store_z, store_x):
         z_path = os.path.join(out_dir, f"Z_shard{shard_idx:03d}.pt")
         torch.save(Z_cat, z_path)
         print(f"  Saved {z_path}  {tuple(Z_cat.shape)}")
+    if store_z:
+        return z_path
+
+def plot_dtd_ztz_scatter(z_path,sae,out_dir,arch,layer,sparsity):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    Z = torch.load(z_path).float().numpy()
+    #Z = Z[:,:16]
+
+    # release,sae_id = ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_0")
+    # sae = SAE.from_pretrained(release=release,sae_id=sae_id,device=device)
+    D = (sae.W_dec).float().detach().cpu().numpy()
+    #D = D[:16,:]
+    ZTZ = Z.T @ Z 
+    DTD = D @ D.T
+
+    off_diagonals = torch.tril_indices(row=D.shape[1], col=D.shape[1], offset=-1)
+    y = ZTZ[*off_diagonals]
+    x = DTD[*off_diagonals]
+
+    # Scatter plot
+    plt.figure(figsize=(6, 6))
+    plt.grid(alpha=0.15)
+    plt.scatter(x, y)
+    plt.xlabel("DTD entries")
+    plt.ylabel("ZTZ entries")
+    plt.title(f"DTD vs ZTZ scatter (Arch={arch},Layer={layer},Sparsity={sparsity})")
+    plt.yscale("log")
+    plt.legend()
+    plt.tight_layout()
+    plot_path = os.path.join(out_dir, f"dtd_vs_ztz_{datetime.now():%Y%m%d%H%M%S}.png")
+
+    plt.savefig(plot_path)
+    plt.close()
 
 
 def collect_and_save_sharded(layer,
     model, sae, activation_store,
     out_dir, n_batches, batch_size, shard_size,
-    save_dtype, store_x, store_z,
+    save_dtype, store_x, store_z,plot,arch,sparsity
 ):
  
     os.makedirs(out_dir, exist_ok=True) #creates output folder if it doesn't exist
@@ -150,12 +207,18 @@ def collect_and_save_sharded(layer,
 
             # flush shard when full 
             if tokens_in_buf >= shard_size:
+                if store_z:
+                    z_path = os.path.join(out_dir, f"Z_shard{shard_idx:03d}.pt")
                 _save_shard(all_X, all_Z, out_dir, shard_idx, store_x, store_z)
                 all_X, all_Z  = [], []
                 tokens_in_buf = 0
                 shard_idx    += 1
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
+                if store_z and plot:
+                    plot_dtd_ztz_scatter(z_path, sae, out_dir,arch,layer,sparsity)
+                break
+
 
             if (batch_idx + 1) % 50 == 0:
                 print(f"  batch {batch_idx + 1}/{n_batches} "
@@ -163,7 +226,7 @@ def collect_and_save_sharded(layer,
 
     # flush any remaining tokens
     if all_X or all_Z:
-        _save_shard(all_X, all_Z, out_dir, shard_idx, store_z)
+        _save_shard(all_X, all_Z, out_dir, shard_idx, store_x, store_z)
 
     total = (shard_idx + 1) * shard_size  # approximate
     print(f"\nDone. Shards written to {out_dir}/")
@@ -171,6 +234,21 @@ def collect_and_save_sharded(layer,
 
 def main():
     args = parse_args()
+
+    if args.task_id is not None:
+        cfg = read_config(args.task_id, args.config_csv)
+        if cfg is None:
+            raise SystemExit(f"No config found for task_id {args.task_id}")
+        args.layer    = int(cfg["layer"])
+        args.arch     = cfg["arch"]
+        args.sparsity = cfg["sparsity"]
+
+    if args.layer is None or args.arch is None or args.sparsity is None:
+        raise SystemExit("Provide --task_id, or all of --layer/--arch/--sparsity")
+
+    if args.out_dir is None:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        args.out_dir = f"june16outputs/layer{args.layer}_{args.arch}_l0{args.sparsity}_{ts}"
 
     if not args.store_x and not args.store_z: # if we don't choose to save X, Z --> warning
         raise SystemExit("Nothing to save — pass --store_x and/or --store_z")
@@ -209,6 +287,9 @@ def main():
         save_dtype  = save_dtype,
         store_x     = args.store_x,
         store_z     = args.store_z,
+        plot = args.plot,
+        arch = args.arch,
+        sparsity = args.sparsity
     )
 
 

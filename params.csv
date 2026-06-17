@@ -1,0 +1,3 @@
+layer,arch,sparsity
+12,relu,20
+19,matryoshka,40
