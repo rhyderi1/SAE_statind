@@ -3,7 +3,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=15:00:00
+#SBATCH --time=00:30:00
 #SBATCH --job-name=create_scatterplots_arrayjob
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err

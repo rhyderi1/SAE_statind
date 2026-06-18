@@ -135,14 +135,16 @@ def plot_dtd_ztz_scatter(z_path,sae,out_dir,arch,layer,sparsity):
     off_diagonals = torch.tril_indices(row=D.shape[1], col=D.shape[1], offset=-1)
     y = ZTZ[*off_diagonals]
     x = DTD[*off_diagonals]
+    x = np.abs(x)
 
     # Scatter plot
     plt.figure(figsize=(6, 6))
     plt.grid(alpha=0.15)
     plt.scatter(x, y)
-    plt.xlabel("DTD entries")
+    plt.xlabel("DTD entries (magnitude)")
     plt.ylabel("ZTZ entries")
-    plt.title(f"DTD vs ZTZ scatter (Arch={arch},Layer={layer},Sparsity={sparsity})")
+    plt.title(f"|DTD| vs ZTZ scatter (Arch={arch},Layer={layer},Sparsity={sparsity})")
+    plt.xlim(0, 1)
     plt.yscale("log")
     plt.legend()
     plt.tight_layout()
@@ -248,7 +250,7 @@ def main():
 
     if args.out_dir is None:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.out_dir = f"june16outputs/layer{args.layer}_{args.arch}_l0{args.sparsity}_{ts}"
+        args.out_dir = f"june17outputs/layer{args.layer}_{args.arch}_l0{args.sparsity}_{ts}"
 
     if not args.store_x and not args.store_z: # if we don't choose to save X, Z --> warning
         raise SystemExit("Nothing to save — pass --store_x and/or --store_z")
