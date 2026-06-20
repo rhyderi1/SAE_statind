@@ -14,10 +14,10 @@ except ImportError:
     raise SystemExit("Set this import to your infer_z module name, or paste SAE_DATA in directly.")
 
 DEVICE     = "cuda" if torch.cuda.is_available() else "cpu"
-MAX_POINTS = 300_000           # sampled off-diagonal pairs per panel
+#MAX_POINTS = 300_000           # sampled off-diagonal pairs per panel
 SEED       = 0                 # reproducibility -> recorded in the summary CSV
-FIG_DIR    = "figures/grams"
-SUMMARY_CSV = "figures/grams/spearman_summary.csv"
+FIG_DIR    = "figuresjune19/grams"
+SUMMARY_CSV = "figuresjune19/grams/spearman_summary.csv"
 
 # One entry per SAE. z_dir is the timestamped folder infer_z.py wrote, e.g.
 #   june17outputs/layer12_relu_l020_20250617_143022
@@ -27,6 +27,10 @@ CONFIGS = [
     {"layer": 12, "arch": "topk",       "sparsity": "20", "z_dir": "/home/rhyderi1/projects/aip-bahtol/rhyderi1/sae_statind/june17outputs/layer12_topk_l020_20260617_161513/Z_shard000.pt"},
     {"layer": 12, "arch": "jumprelu",   "sparsity": "22", "z_dir": "/home/rhyderi1/projects/aip-bahtol/rhyderi1/sae_statind/june17outputs/layer12_jumprelu_l022_20260617_161645/Z_shard000.pt"},
     {"layer": 12, "arch": "matryoshka", "sparsity": "40", "z_dir": "/home/rhyderi1/projects/aip-bahtol/rhyderi1/sae_statind/june17outputs/layer12_matryoshka_l040_20260617_161756/Z_shard000.pt"},
+    {"layer": 19, "arch": "relu",       "sparsity": "20", "z_dir": "/home/rhyderi1/projects/aip-bahtol/rhyderi1/sae_statind/june17outputs/layer19_relu_l020_20260617_161800/Z_shard000.pt"},
+    {"layer": 19, "arch": "topk",       "sparsity": "20", "z_dir": "/home/rhyderi1/projects/aip-bahtol/rhyderi1/sae_statind/june17outputs/layer19_topk_l020_20260617_161928/Z_shard000.pt"},
+    {"layer": 19, "arch": "jumprelu",   "sparsity": "23", "z_dir": "/home/rhyderi1/projects/aip-bahtol/rhyderi1/sae_statind/june17outputs/layer19_jumprelu_l023_20260617_162032/Z_shard000.pt"},
+    {"layer": 19, "arch": "matryoshka", "sparsity": "40", "z_dir": "/home/rhyderi1/projects/aip-bahtol/rhyderi1/sae_statind/june17outputs/layer19_matryoshka_l040_20260617_162128/Z_shard000.pt"},
     # ... layer 19 likewise
 ]
 
@@ -62,19 +66,24 @@ def accumulate_z_grams(z_path, p, device):
             torch.cuda.empty_cache()
     return ZtZ, ZtZ_l0, col_act
 
-def sample_pairs(q, n, device, seed=SEED):
-    """Uniform off-diagonal (i>j) pairs. Equivalent to subsampling the full lower triangle,
-    but never builds the ~q^2/2 index tensor. Falls back to all pairs when q is small."""
-    g = torch.Generator(device=device).manual_seed(seed)
-    n_all = q * (q - 1) // 2
-    if n_all <= n:
-        off = torch.tril_indices(q, q, offset=-1, device=device)
-        return off[0], off[1]
-    i = torch.randint(0, q, (2 * n,), generator=g, device=device)
-    j = torch.randint(0, q, (2 * n,), generator=g, device=device)
-    m = i > j
-    i, j = i[m][:n], j[m][:n]
-    return i, j
+# def sample_pairs(q, n, device, seed=SEED):
+#     """Uniform off-diagonal (i>j) pairs. Equivalent to subsampling the full lower triangle,
+#     but never builds the ~q^2/2 index tensor. Falls back to all pairs when q is small."""
+#     g = torch.Generator(device=device).manual_seed(seed)
+#     n_all = q * (q - 1) // 2
+#     if n_all <= n:
+#         off = torch.tril_indices(q, q, offset=-1, device=device)
+#         return off[0], off[1]
+#     i = torch.randint(0, q, (2 * n,), generator=g, device=device)
+#     j = torch.randint(0, q, (2 * n,), generator=g, device=device)
+#     m = i > j
+#     i, j = i[m][:n], j[m][:n]
+#     return i, j
+
+def sample_pairs(q, device):
+    """All off-diagonal (i>j) pairs."""
+    off = torch.tril_indices(q, q, offset=-1, device=device)
+    return off[0], off[1]
 
 
 def decoder_pair_values(W, i, j, batch=100_000):
@@ -113,7 +122,8 @@ def run_config(cfg, writer):
     ZtZ, ZtZ_l0, W = ZtZ[keep][:, keep], ZtZ_l0[keep][:, keep], W[keep]
     q = int(keep.sum())
 
-    i, j = sample_pairs(q, MAX_POINTS, DEVICE)
+    #i, j = sample_pairs(q, MAX_POINTS, DEVICE)
+    i, j = sample_pairs(q, DEVICE)
     ztz  = ZtZ[i, j]
     zl0  = ZtZ_l0[i, j]
     del ZtZ, ZtZ_l0
@@ -142,7 +152,7 @@ def run_config(cfg, writer):
             if xlim:
                 ax.set_xlim(*xlim)
             ax.set_xlabel(xlab); ax.set_ylabel(ylab); ax.grid(alpha=0.15)
-            # ax.set_ylim(1e-1, 1e4)  # pin these by hand if you want shared y across architectures
+            ax.set_ylim(1e-2, 1e5)  # shared y across architectures
     axes[0, 0].set_title(title)
     os.makedirs(FIG_DIR, exist_ok=True)
     fig.savefig(os.path.join(FIG_DIR, title.replace(" ", "_").replace("=", "") + ".png"), dpi=300)

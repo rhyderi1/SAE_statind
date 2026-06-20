@@ -13,14 +13,14 @@ except ImportError:
     raise SystemExit("Point this import at your infer_z module, or paste SAE_DATA here.")
 
 DEVICE      = "cuda" if torch.cuda.is_available() else "cpu"
-MAX_POINTS  = 200_000          # sampled off-diagonal pairs, per sparsity, per panel
+#MAX_POINTS  = 200_000          # sampled off-diagonal pairs, per sparsity, per panel
 SEED        = 0
 BASE_DIR    = "june17outputs"  # where infer_z wrote the timestamped run folders
-FIG_DIR     = "figures/grams"
+FIG_DIR     = "green_plots_v2/grams"
 SUMMARY_CSV = os.path.join(FIG_DIR, "spearman_summary.csv")
 
 CLIP_XLIM   = True             # match reference: both x-columns pinned to [-1, 1]
-YLIM        = (1e-1, 1e4)      # match reference y-range on every panel
+YLIM        = (1e-2, 1e5)      # match reference y-range on every panel
 SCATTER     = dict(s=0.3, alpha=0.03)   # tune alpha down if 3 overlaid clouds saturate
 COLORS      = ["#1f77b4", "#ff7f0e", "#2ca02c", "#9467bd"]  # one per sparsity
 
@@ -70,17 +70,21 @@ def accumulate_z_grams(z_dir, p, device):
     return ZtZ, ZtZ_l0, col_act
 
 
-def sample_pairs(q, n, device, seed=SEED):
-    """Uniform off-diagonal (i>j) pairs without building the full q^2/2 index set."""
-    if q * (q - 1) // 2 <= n:
-        off = torch.tril_indices(q, q, offset=-1, device=device)
-        return off[0], off[1]
-    g = torch.Generator(device=device).manual_seed(seed)
-    i = torch.randint(0, q, (2 * n,), generator=g, device=device)
-    j = torch.randint(0, q, (2 * n,), generator=g, device=device)
-    m = i > j
-    return i[m][:n], j[m][:n]
+# def sample_pairs(q, n, device, seed=SEED):
+#     """Uniform off-diagonal (i>j) pairs without building the full q^2/2 index set."""
+#     if q * (q - 1) // 2 <= n:
+#         off = torch.tril_indices(q, q, offset=-1, device=device)
+#         return off[0], off[1]
+#     g = torch.Generator(device=device).manual_seed(seed)
+#     i = torch.randint(0, q, (2 * n,), generator=g, device=device)
+#     j = torch.randint(0, q, (2 * n,), generator=g, device=device)
+#     m = i > j
+#     return i[m][:n], j[m][:n]
 
+def sample_pairs(q, device):
+    """All off-diagonal (i>j) pairs."""
+    off = torch.tril_indices(q, q, offset=-1, device=device)
+    return off[0], off[1]
 
 def decoder_pair_values(W, i, j, batch=100_000):
     """Raw d_i.d_j and cosine on the sampled pairs only (batched to cap memory)."""
@@ -116,7 +120,8 @@ def compute_quantities(layer, arch, sparsity):
     ZtZ, ZtZ_l0, W = ZtZ[keep][:, keep], ZtZ_l0[keep][:, keep], W[keep]
     q = int(keep.sum())
 
-    i, j = sample_pairs(q, MAX_POINTS, DEVICE)               # one idx, shared across panels
+    # i, j = sample_pairs(q, MAX_POINTS, DEVICE)               # one idx, shared across panels
+    i, j = sample_pairs(q, DEVICE)               # one idx, shared across panels
     ztz, zl0 = ZtZ[i, j], ZtZ_l0[i, j]
     del ZtZ, ZtZ_l0
     if DEVICE == "cuda":

@@ -17,7 +17,7 @@ from datetime import datetime
 import csv
 import time
 now = datetime.now()
-YLIM = (1e-2, 1e8) 
+YLIM = (1e-3, 1e8) 
 
 SAE_DATA = {
     12: {
@@ -251,7 +251,7 @@ def main():
 
     if args.out_dir is None:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.out_dir = f"june18outputs/layer{args.layer}_{args.arch}_l0{args.sparsity}_{ts}"
+        args.out_dir = f"june19outputs/layer{args.layer}_{args.arch}_l0{args.sparsity}_{ts}"
 
     if not args.store_x and not args.store_z: # if we don't choose to save X, Z --> warning
         raise SystemExit("Nothing to save — pass --store_x and/or --store_z")
