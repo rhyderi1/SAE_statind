@@ -14,6 +14,7 @@ except ImportError:
     raise SystemExit("Set this import to your infer_z module name, or paste SAE_DATA in directly.")
 
 DEVICE     = "cuda" if torch.cuda.is_available() else "cpu"
+BASE_DIR   = "SAE_DATA_files"  # where infer_z wrote the timestamped run folders
 #MAX_POINTS = 300_000           # sampled off-diagonal pairs per panel
 SEED       = 0                 # reproducibility -> recorded in the summary CSV
 FIG_DIR    = "figuresjune19/grams"

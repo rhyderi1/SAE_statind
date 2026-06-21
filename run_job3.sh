@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
 #SBATCH --time=1:00:00
-#SBATCH --job-name=layer12absorption
+#SBATCH --job-name=step_4_pairs_analysis
 #SBATCH --output=%x-%j.out
 #SBATCH --error=%x-%j.err
 export HF_TOKEN=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
@@ -13,4 +13,4 @@ source /project/aip-bahtol/rhyderi1/sae_statind/.venv/bin/activate
 
 cd /project/aip-bahtol/rhyderi1/sae_statind
 
-python run_layer12_absorption.py
+python -m analysis.step4_pairs
