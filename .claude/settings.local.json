@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(/usr/bin/python3 *)"
+    ]
+  }
+}

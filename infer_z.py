@@ -132,7 +132,7 @@ def plot_dtd_ztz_scatter(z_path,sae,out_dir,arch,layer,sparsity):
     ZTZ = Z.T @ Z 
     DTD = D @ D.T
 
-    off_diagonals = torch.tril_indices(row=D.shape[1], col=D.shape[1], offset=-1)
+    off_diagonals = torch.tril_indices(row=D.shape[0], col=D.shape[0], offset=-1)
     y = ZTZ[*off_diagonals]
     x = DTD[*off_diagonals]
 
