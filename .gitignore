@@ -18,3 +18,4 @@ logs/
 *.parquet
 *.csv
 *.dat
+*.pth
