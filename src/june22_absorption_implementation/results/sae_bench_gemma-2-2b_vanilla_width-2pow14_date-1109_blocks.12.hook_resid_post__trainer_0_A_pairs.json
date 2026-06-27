@@ -1,0 +1,61 @@
+{
+  "letter": "A",
+  "sae_release": "sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109",
+  "sae_id": "blocks.12.hook_resid_post__trainer_0",
+  "layer": 12,
+  "s_main": [
+    1628
+  ],
+  "n_probe_positives_checked": 2601,
+  "n_full_absorption_events": 6,
+  "n_pairs": 6,
+  "absorber_counts": {
+    "7214": 3,
+    "11192": 2,
+    "8436": 1
+  },
+  "pairs": [
+    {
+      "absorber": 7214,
+      "absorbee": 1628,
+      "token": "Alguns",
+      "absorber_probe_cos": 0.033935546875,
+      "absorber_probe_proj": 0.4432830810546875
+    },
+    {
+      "absorber": 7214,
+      "absorbee": 1628,
+      "token": "antenimiento",
+      "absorber_probe_cos": 0.033935546875,
+      "absorber_probe_proj": 0.48358154296875
+    },
+    {
+      "absorber": 7214,
+      "absorbee": 1628,
+      "token": " apalagi",
+      "absorber_probe_cos": 0.033935546875,
+      "absorber_probe_proj": 0.4814605712890625
+    },
+    {
+      "absorber": 11192,
+      "absorbee": 1628,
+      "token": "asteroido",
+      "absorber_probe_cos": 0.051025390625,
+      "absorber_probe_proj": 0.36993408203125
+    },
+    {
+      "absorber": 8436,
+      "absorbee": 1628,
+      "token": "antMatchers",
+      "absorber_probe_cos": 0.06689453125,
+      "absorber_probe_proj": 0.5330657958984375
+    },
+    {
+      "absorber": 11192,
+      "absorbee": 1628,
+      "token": "ArrowToggle",
+      "absorber_probe_cos": 0.051025390625,
+      "absorber_probe_proj": 0.70159912109375
+    }
+  ]
+}

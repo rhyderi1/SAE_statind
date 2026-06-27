@@ -4,7 +4,6 @@ matryoshka-sae/
 76_Evaluating_Sparse_Autoencod_Code/
 **/*.pt
 **/*.err
-**/*.err
 reference_code/
 .vscode/
 Summer 2026/
@@ -14,4 +13,8 @@ __pycache__/
 .venv/
 venv/
 *.out
-
+logs/
+*.npz
+*.parquet
+*.csv
+*.dat
