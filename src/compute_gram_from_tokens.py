@@ -194,8 +194,6 @@ def main():
 
     print(f"\nLoading model + SAE on {device} ...")
     model = HookedTransformer.from_pretrained(
-        # HookedTransfomer is a transformer architecture (with the model choice you select)
-        #that has HookedRootModule (allows you to intercept model forward pass at some layer)
         args.modelchoice, device=device, dtype=save_dtype
     )
     sae = get_sae(args.layer, args.arch, args.sparsity, device)
