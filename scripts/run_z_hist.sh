@@ -2,8 +2,7 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
-#SBATCH --time=2:00:00
-#SBATCH --job-name=step_4_summary_metric
+#SBATCH --time=1:00:00
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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
@@ -15,4 +14,4 @@ cd /project/aip-bahtol/rhyderi1/sae_statind
 
 mkdir -p logs
 
-python -m src.step4_summary_metric
+python src/z_histogram.py

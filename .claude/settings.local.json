@@ -34,7 +34,8 @@
       "Bash(python3 *)",
       "Bash(git -C /home/razah/vulcan-sae_statind ls-files)",
       "Bash(git *)",
-      "Bash(.venv/bin/python3 *)"
+      "Bash(.venv/bin/python3 *)",
+      "Bash(ssh vulcan *)"
     ]
   }
 }
