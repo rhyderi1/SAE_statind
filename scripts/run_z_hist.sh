@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --account=aip-bahtol
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=1:00:00
+#SBATCH --time=8:00:00
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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

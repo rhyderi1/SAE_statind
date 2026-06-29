@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 YLIM        = (1e-4, 1e10)
+XLIM        = (-1.05, 1.05)
 MAX_POINTS = 300_000
 SEED = 42
 SCRIPT_NAME = "dtdxztz_scatter_simple"
@@ -48,6 +49,7 @@ plt.xlabel(r"$d_i^\top d_j$")
 plt.ylabel(r"$z_i^\top z_j$")
 plt.yscale("log")
 plt.ylim(YLIM)
+plt.xlim(XLIM)
 plt.grid(alpha=0.15)
 
 plt.title(f"arch={arch}   layer={layer}   l0={sparsity}",

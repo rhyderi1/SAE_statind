@@ -2,7 +2,7 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=0:30:00
+#SBATCH --time=0:15:00
 #SBATCH --job-name=dxz_scat_simple
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
