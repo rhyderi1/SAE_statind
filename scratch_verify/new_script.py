@@ -34,7 +34,7 @@ context_size = 128
 batch_size = 32
 hook_name = 'blocks.12.hook_resid_post'
 release, sae_id = SAE_DATA[12]["relu"]["20"]
-n_batches = 1209
+n_batches = 3
 layer = 12
 num_bins = 100
 top_k = 10
@@ -151,7 +151,7 @@ for b in range(num_bins):
         "top_latent_counts": [int(row[f]) for f in top_latents],
     })
 
-out_path = Path(__file__).parent.parent / "results" / "z_hist_latent_contributors.json"
+out_path = Path(__file__).parent.parent / "results" / "verify_new.json"
 out_path.parent.mkdir(parents=True, exist_ok=True)
 with open(out_path, "w") as f:
     json.dump({

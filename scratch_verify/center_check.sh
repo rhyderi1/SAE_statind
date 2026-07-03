@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --account=aip-bahtol
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
-#SBATCH --time=8:00:00
-#SBATCH --output=logs/%x-%j.out
-#SBATCH --error=logs/%x-%j.err
+#SBATCH --time=00:10:00
+#SBATCH --output=scratch_verify/center_check-%j.out
+#SBATCH --error=scratch_verify/center_check-%j.err
 export HF_TOKEN=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
 
 module load python/3.11.5
@@ -13,6 +13,4 @@ source /project/aip-bahtol/rhyderi1/sae_statind/.venv/bin/activate
 
 cd /project/aip-bahtol/rhyderi1/sae_statind
 
-mkdir -p logs
-
-python src/z_hist_latent_stats_other.py
+python scratch_verify/center_check.py

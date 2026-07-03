@@ -1,44 +1,99 @@
 """
-Extract per-letter S_main and S_abs dicts from the sae_bench absorption parquet
-and save them to results/absorption_sets.json.
+SAEBench absorption creates a parquet file.
+Here, we extract per-letter S_main and S_abs from the sae_bench absorption parquet.
 
 S_main[letter] = list of SAE latent indices from k-sparse probing (the "main" feature)
-S_abs[letter]  = sorted list of unique top absorber latents across full-absorption events
+S_abs[letter]  = list of unique absorbing latents across full-absorption events,
+                    written as [latent, n] where n is how many absorption events 
+
+Note: this script uses is_full_absorption to identify absorption events, so each event has exactly one
+absorber by construction (one latent, `top_projection_feat`, must carry the
+letter signal on its own).
+
 """
 import json
+import re
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
 import pandas as pd
 
+from infer_z import SAE_DATA
+
+# --- parameters ---
+ARCH = "relu"
+LAYER = 12
+SPARSITY = "20"
+release, sae_id = SAE_DATA[LAYER][ARCH][SPARSITY]
+
+# The sae_bench absorption eval saves one parquet per SAE, in a folder named
+# "{release}_{sae_id}", with the file itself named "layer_{layer}_{release}_{sae_id}.parquet".
+folder_name = f"{release}_{sae_id}"
+file_name = f"layer_{LAYER}_{release}_{sae_id}.parquet"
 PARQUET = (
     Path(__file__).parent.parent
     / ".venv/lib/python3.11/site-packages/sae_bench/artifacts/absorption"
     / "feature_absorption"
-    / "sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109_blocks.12.hook_resid_post__trainer_0"
-    / "layer_12_sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109_blocks.12.hook_resid_post__trainer_0.parquet"
+    / folder_name
+    / file_name
 )
-OUT = Path(__file__).parent.parent / "results" / "absorption_sets.json"
+
+timestamp = datetime.now(ZoneInfo("America/Edmonton")).strftime("%Y%m%d_%H%M%S")
+OUT = (
+    Path(__file__).parent.parent
+    / "results"
+    / f"absorption_sets_{ARCH}_layer{LAYER}_k{SPARSITY}_{timestamp}.json"
+)
 
 
 def main() -> None:
     df = pd.read_parquet(PARQUET)
 
-    s_main: dict[str, list[int]] = {}
-    s_abs: dict[str, list[int]] = {}
+    s_main = {}
+    s_abs = {}
 
     for letter, grp in df.groupby("letter"):
+        # grp is the sub-DataFrame of just that letter's rows (e.g. for letter="a", 
+        # grp is the ~1,200 rows where letter == "a").
+
+        # The main feature is the same for every row of a letter, so take the first one.
         s_main[letter] = [int(x) for x in grp["split_feats"].iloc[0]]
 
-        absorbed = grp[grp["is_full_absorption"]]
-        absorbers: set[int] = set()
-        for top_feat in absorbed["top_projection_feat"]:
-            absorbers.add(int(top_feat))
-        s_abs[letter] = sorted(absorbers)
+        # Count how many full-absorption events each absorbing latent accounted for,
+        # then write one [latent, count] pair per unique latent (sorted by latent).
+        absorbed_rows = grp[grp["is_full_absorption"]]
+        event_counts = {}
+        for feat in absorbed_rows["top_projection_feat"]:
+            feat = int(feat)
+            event_counts[feat] = event_counts.get(feat, 0) + 1
+            # create a dict{latent: count} where the count starts at 0.
+        s_abs[letter] = [[feat, event_counts[feat]] for feat in sorted(event_counts)]
+
+    text = json.dumps({
+        "arch": ARCH,
+        "layer": LAYER,
+        "sparsity": SPARSITY,
+        "s_main": s_main,
+        "s_abs": s_abs,
+    }, indent=2)
+    #each nesting level gets its own lines, indented 2 spaces deeper than its parent.
+
+    # Makes the code look nicer. the json indent expands inner lists (eg: a single latent in square brackets) across multiple lines.
+    # Collapse any bracket with only digits, commas, and whitespace into a single line. 
+    # The char class excludes "[" and "]", so the outer per-letter lists (which
+    # contain nested lists) are left untouched.
+    text = re.sub(
+        r"\[([\d,\s]+)\]",
+        lambda m: "[" + ", ".join(re.findall(r"\d+", m.group(1))) + "]",
+        text,
+    )
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT, "w") as f:
-        json.dump({"s_main": s_main, "s_abs": s_abs}, f, indent=2)
+        f.write(text)
 
-    print(f"Saved → {OUT}")
+    print(f"Saved -> {OUT}")
     for letter in sorted(s_main):
         print(f"  {letter}: S_main={s_main[letter]}  |  S_abs={len(s_abs[letter])} absorbers")
 

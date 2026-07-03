@@ -37,7 +37,15 @@
       "Bash(.venv/bin/python3 *)",
       "Bash(ssh vulcan *)",
       "Read(//home/razah/vulcan-sae_statind/.venv/bin/**)",
-      "Bash(.venv/bin/python3.11 -c \"import numpy; print\\(numpy.__version__\\)\")"
+      "Bash(.venv/bin/python3.11 -c \"import numpy; print\\(numpy.__version__\\)\")",
+      "Bash(sed -i 's/n_batches = 1209/n_batches = 3/' /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/new_script.py)",
+      "Bash(sed -i 's|out_path = Path\\(__file__\\).parent.parent / \"results\" / \"z_hist_latent_contributors.json\"|out_path = Path\\(__file__\\).parent.parent / \"results\" / \"verify_orig.json\"|' /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/orig_script.py)",
+      "Bash(sed -i 's|out_path = Path\\(__file__\\).parent.parent / \"results\" / \"z_hist_latent_contributors.json\"|out_path = Path\\(__file__\\).parent.parent / \"results\" / \"verify_new.json\"|' /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/new_script.py)",
+      "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/orig_script.py vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/orig_script.py)",
+      "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/new_script.py vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/new_script.py)",
+      "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/verify.sh vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/verify.sh)",
+      "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/center_check.py vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/center_check.py)",
+      "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/center_check.sh vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/center_check.sh)"
     ]
   }
 }
