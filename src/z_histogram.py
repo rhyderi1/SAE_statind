@@ -57,7 +57,11 @@ with torch.no_grad():
 Z_final = torch.cat(Z_act_all).float().numpy()
 num_zeros = num_entries - len(Z_final)
 
-counts, bins = np.histogram(Z_final, bins=100)
+max_val = Z_final.max() if len(Z_final) > 0 else 1.0
+# Force the range to start at 0.0 (valid since ReLU activations are >= 0) so
+# bin 0 actually covers the zero entries being added to it below, instead of
+# starting at Z_final.min() (some small positive value) and mislabeling them.
+counts, bins = np.histogram(Z_final, bins=100, range=(0.0, max_val))
 counts[0] += num_zeros
 
 plt.figure()
