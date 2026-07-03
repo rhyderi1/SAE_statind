@@ -3,7 +3,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
 #SBATCH --time=4:00:00
-#SBATCH --job-name=step_4_overlay
+#SBATCH --job-name=feature_z_hist
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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
@@ -15,4 +15,4 @@ cd /project/aip-bahtol/rhyderi1/sae_statind
 
 mkdir -p logs
 
-python -m src.step4_overlay
+python src/z_histogram_latent_stats.py
