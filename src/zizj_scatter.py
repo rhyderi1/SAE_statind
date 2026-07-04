@@ -110,7 +110,12 @@ with torch.no_grad():
         Z = Z.reshape(-1, Z.shape[-1])  # shape (tokens, features)
 
         for latent in wanted_latents:
-            batches_per_latent[latent].append(Z[:, latent].cpu())
+            # .clone() is essential, not decorative: Z[:, latent] is a *view*
+            # into the full (tokens, d_sae) batch matrix, and on a CPU tensor
+            # .cpu() is a no-op that hands back that same view -- so without the
+            # clone we'd retain the entire Z matrix for every batch (hundreds of
+            # MB each) instead of a single (tokens,) column, and OOM mid-stream.
+            batches_per_latent[latent].append(Z[:, latent].detach().clone().cpu())
 
 # Stitch each latent's per-batch pieces into one plain Python list covering
 # every token, and keep working in plain lists (not torch/numpy) from here on.
