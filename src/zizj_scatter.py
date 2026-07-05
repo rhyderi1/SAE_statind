@@ -1,27 +1,18 @@
 '''
 z_i vs z_j scatter, raw and standardized, for a handful of chosen SAE latent pairs.
 
-Because SAE codes are sparse, most tokens leave one or both latents at exactly 0,
-so each panel splits into three visible parts:
-    z_i > 0, z_j = 0   -> a strip sitting exactly on the x-axis
-    z_i = 0, z_j > 0   -> a strip sitting exactly on the y-axis
-    z_i > 0, z_j > 0   -> the off-axis "blob" -- the only region where a
-                          correlation between the two latents is even defined
-We drop the both-zero point at the origin: it would be a single dot with millions
-of overlapping tokens on it, and would visually swamp everything else.
+We drop the (0,0) point at the origin: it would be a single dot with millions
+of overlapping tokens on it.
 
-Each pair gets two panels: RAW (native activation units) and STD (each latent
-centered/scaled using the mean and std computed ONLY over the jointly-active
-tokens -- z_i>0 AND z_j>0). 
+Each pair gets two panels: RAW and STD (each latent
+centered/scaled using the mean and std computed over the joint support)
 
-We use the joint support, not each latent's own support, because the joint-support standard 
-deviation is the one that makes the STD panel's tilt equal the actual on-support correlation; standardizing each
-latent on its own support would inflate the variance with tokens where the other
-latent is off, distorting the blob's apparent shape.
+For standardization, we leave inactive (zero) entries at exactly 0, so that the strip/blob shape is preserved. 
+Otherwise, they would no longer be at 0, and the strip/blob shape would be lost.
 '''
 
 import matplotlib
-matplotlib.use('Agg')  # Must precede pyplot import
+matplotlib.use('Agg') 
 import matplotlib.pyplot as plt
 
 import torch
@@ -42,7 +33,6 @@ ARCH = "relu"
 LAYER = 12
 SPARSITY = "20"
 
-# Each tuple is one (latent_i, latent_j) pair to scatter against each other.
 PAIRS = [
     (477, 10069),
     (1628,2969)
@@ -50,7 +40,6 @@ PAIRS = [
 
 MARKER_SIZE = 2.5
 ALPHA = 0.3
-MAX_POINTS_PER_PANEL = 60_000  # keep the plot fast/legible; excess points are thinned out, not chosen at random
 
 hook_name = f'blocks.{LAYER}.hook_resid_post'
 release, sae_id = SAE_DATA[LAYER][ARCH][SPARSITY]
@@ -71,14 +60,6 @@ activation_store = ActivationsStore.from_sae(
 )
 
 
-# ----------------------------------------------------------------------------
-# 1) Stream batches, keep only the columns for latents we actually plot
-# ----------------------------------------------------------------------------
-
-# Every latent index that appears in any pair, with duplicates removed. These
-# are the only SAE columns we ever pull out of Z, so memory stays small (a
-# handful of columns x every token) instead of the full (tokens x n_features)
-# matrix.
 
 wanted_latents = []
 for (i, j) in PAIRS:
@@ -87,7 +68,6 @@ for (i, j) in PAIRS:
     if j not in wanted_latents:
         wanted_latents.append(j)
 
-# One accumulator list per wanted latent, keyed by latent index.
 batches_per_latent = {}
 for latent in wanted_latents:
     batches_per_latent[latent] = []
@@ -110,29 +90,18 @@ with torch.no_grad():
         Z = Z.reshape(-1, Z.shape[-1])  # shape (tokens, features)
 
         for latent in wanted_latents:
-            # .clone() is essential, not decorative: Z[:, latent] is a *view*
-            # into the full (tokens, d_sae) batch matrix, and on a CPU tensor
-            # .cpu() is a no-op that hands back that same view -- so without the
-            # clone we'd retain the entire Z matrix for every batch (hundreds of
-            # MB each) instead of a single (tokens,) column, and OOM mid-stream.
+            # Note: the slice is just a view not a copy. Without the
+            # clone we'd retain the entire Z matrix for every batch instead of a few columns, and OOM.
             batches_per_latent[latent].append(Z[:, latent].detach().clone().cpu())
 
-# Stitch each latent's per-batch pieces into one plain Python list covering
-# every token, and keep working in plain lists (not torch/numpy) from here on.
 columns = {}
 for latent in wanted_latents:
     columns[latent] = torch.cat(batches_per_latent[latent]).float().tolist()
 
 
-# ----------------------------------------------------------------------------
-# 2) Basic-loop statistics: joint-support mean/std and on-support correlation
-# ----------------------------------------------------------------------------
-
 def joint_support_mean_and_std(zi, zj):
     """
-    Mean and std of zi and zj, computed only over tokens where BOTH are active
-    (> 0) -- the "joint support". Written as a plain loop over every token
-    instead of boolean-mask array indexing, so it reads like a running total.
+    Mean and std of zi and zj, computed only over the "joint support"
     """
     sum_i = 0.0
     sum_j = 0.0
@@ -168,11 +137,8 @@ def joint_support_mean_and_std(zi, zj):
 
 def standardize(zi, zj, mean_i, std_i, mean_j, std_j):
     """
-    Center/scale zi and zj using the joint-support mean/std passed in, but only
-    for entries where that particular latent is itself active. Inactive (zero)
-    entries are left at exactly 0 -- otherwise subtracting the mean would move
-    the axis strips off their axis, and the strip/blob shape we care about
-    would be lost.
+    Center/scale zi and zj using the joint-support mean/std passed in. Inactive (zero)
+    entries are left at exactly 0 -- see top of file.
     """
     zi_std = []
     for value in zi:
@@ -192,7 +158,9 @@ def standardize(zi, zj, mean_i, std_i, mean_j, std_j):
 
 
 def on_support_correlation(zi, zj):
-    """Pearson correlation of zi and zj, computed only over jointly-active tokens."""
+    """
+    Pearson correlation of zi and zj, computed only over jointly-active tokens. We want an inverse relationship.
+    """
     paired_i = []
     paired_j = []
     for k in range(len(zi)):
@@ -224,14 +192,10 @@ def on_support_correlation(zi, zj):
     return numerator / denominator, n
 
 
-def drop_both_zero_and_thin(zi, zj, max_points):
+def drop_both_zero(zi, zj):
     """
     Keep only tokens where at least one of zi, zj is active (drops the
-    uninformative both-zero pile at the origin), then thin the remainder down
-    to at most max_points by keeping every Nth point. Plain step-slicing
-    instead of numpy's random-choice subsampling -- simpler, though it means
-    the kept points are evenly spaced through the stream rather than a random
-    sample of it.
+    uninformative (0,0) pile at the origin).
     """
     kept_i = []
     kept_j = []
@@ -240,16 +204,8 @@ def drop_both_zero_and_thin(zi, zj, max_points):
             kept_i.append(zi[k])
             kept_j.append(zj[k])
 
-    if len(kept_i) <= max_points:
-        return kept_i, kept_j
+    return kept_i, kept_j
 
-    step = len(kept_i) // max_points
-    return kept_i[::step], kept_j[::step]
-
-
-# ----------------------------------------------------------------------------
-# 3) Plot: one row per pair, RAW panel and STD panel side by side
-# ----------------------------------------------------------------------------
 
 n_pairs = len(PAIRS)
 fig, axes = plt.subplots(n_pairs, 2, figsize=(7.2, 3.4 * n_pairs), squeeze=False)
@@ -263,7 +219,7 @@ for row in range(n_pairs):
     mean_i, std_i, mean_j, std_j = joint_support_mean_and_std(zi, zj)
     zi_std, zj_std = standardize(zi, zj, mean_i, std_i, mean_j, std_j)
 
-    raw_x, raw_y = drop_both_zero_and_thin(zi, zj, MAX_POINTS_PER_PANEL)
+    raw_x, raw_y = drop_both_zero(zi, zj)
     ax_raw = axes[row][0]
     ax_raw.scatter(raw_x, raw_y, s=MARKER_SIZE, alpha=ALPHA, linewidths=0)
     ax_raw.axhline(0, lw=0.6, color="0.55")
@@ -272,7 +228,7 @@ for row in range(n_pairs):
     ax_raw.set_ylabel(f"z_{j}")
     ax_raw.set_title(f"z_{i} vs z_{j} -- RAW (co-act={coact_count}, on-supp r={r:+.2f})", fontsize=9)
 
-    std_x, std_y = drop_both_zero_and_thin(zi_std, zj_std, MAX_POINTS_PER_PANEL)
+    std_x, std_y = drop_both_zero(zi_std, zj_std)
     ax_std = axes[row][1]
     ax_std.scatter(std_x, std_y, s=MARKER_SIZE, alpha=ALPHA, linewidths=0)
     ax_std.axhline(0, lw=0.6, color="0.55")
