@@ -50,7 +50,10 @@
       "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/stride_check.sh vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/stride_check.sh)",
       "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/leak_check.py vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/leak_check.py)",
       "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/leak_check.sh vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/leak_check.sh)",
-      "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/leak_check.sh vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/leak_check32.sh)"
+      "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/leak_check.sh vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/leak_check32.sh)",
+      "Bash(xargs ls -lt)",
+      "Bash(awk '{print $6, $7, $8, $9}')",
+      "Bash(awk '{print $6,$7,$8,$9}')"
     ]
   }
 }
