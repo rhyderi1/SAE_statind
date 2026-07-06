@@ -100,18 +100,16 @@ def joint_support_stats(zi, zj):
     """
     m = (zi > 0) & (zj > 0)
     n = int(m.sum().item())
-    if n < 2:
-        one = torch.tensor(1.0, device=zi.device)
-        zero = torch.tensor(0.0, device=zi.device)
-        return zero, one, zero, one, float("nan"), n
 
     zi_m, zj_m = zi[m], zj[m]
     mean_i, mean_j = zi_m.mean(), zj_m.mean()
     di, dj = zi_m - mean_i, zj_m - mean_j
 
-    std_i = di.square().mean().sqrt().clamp_min(1e-8)   # population std (matches old code)
+    std_i = di.square().mean().sqrt().clamp_min(1e-8)   
     std_j = dj.square().mean().sqrt().clamp_min(1e-8)
 
+
+    #compute R value
     denom = di.square().sum().sqrt() * dj.square().sum().sqrt()
     r = float((di * dj).sum() / denom) if denom > 0 else float("nan")
 
@@ -119,10 +117,7 @@ def joint_support_stats(zi, zj):
 
 
 def standardize_all(zi, zj, mean_i, std_i, mean_j, std_j):
-    """
-    Center/scale EVERY entry (including inactive zeros) by the joint-support
-    mean/std. Inactive entries map to -mean/std rather than staying at 0.
-    """
+
     return (zi - mean_i) / std_i, (zj - mean_j) / std_j
 
 
@@ -139,9 +134,7 @@ for row in range(n_pairs):
     mean_i, std_i, mean_j, std_j, r, coact_count = joint_support_stats(zi, zj)
     zi_std, zj_std = standardize_all(zi, zj, mean_i, std_i, mean_j, std_j)
 
-    # Drop ONLY the exact (0,0) origin; keep every other point. Based off the RAW activations 
-    # (which are >= 0), so the only thing at
-    # (0,0) is the both-inactive pile
+    # Drop ONLY the exact (0,0) origin; keep every other point. 
     keep = (zi != 0) | (zj != 0)
     n_plotted = int(keep.sum().item())
     total_tokens = int(zi.numel())

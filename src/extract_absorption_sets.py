@@ -27,8 +27,6 @@ LAYER = 12
 SPARSITY = "20"
 release, sae_id = SAE_DATA[LAYER][ARCH][SPARSITY]
 
-# The sae_bench absorption eval saves one parquet per SAE, in a folder named
-# "{release}_{sae_id}", with the file itself named "layer_{layer}_{release}_{sae_id}.parquet".
 folder_name = f"{release}_{sae_id}"
 file_name = f"layer_{LAYER}_{release}_{sae_id}.parquet"
 PARQUET = (
@@ -60,8 +58,6 @@ def main() -> None:
         # The main feature is the same for every row of a letter, so take the first one.
         s_main[letter] = [int(x) for x in grp["split_feats"].iloc[0]]
 
-        # Count how many full-absorption events each absorbing latent accounted for,
-        # then write one [latent, count] pair per unique latent (sorted by latent).
         absorbed_rows = grp[grp["is_full_absorption"]]
         event_counts = {}
         for feat in absorbed_rows["top_projection_feat"]:
@@ -79,10 +75,9 @@ def main() -> None:
     }, indent=2)
     #each nesting level gets its own lines, indented 2 spaces deeper than its parent.
 
-    # Makes the code look nicer. the json indent expands inner lists (eg: a single latent in square brackets) across multiple lines.
+    # Makes the code look nicer. the json indent expands inner lists 
     # Collapse any bracket with only digits, commas, and whitespace into a single line. 
-    # The char class excludes "[" and "]", so the outer per-letter lists (which
-    # contain nested lists) are left untouched.
+    # outer per-letter lists (which contain nested lists) are left untouched.
     text = re.sub(
         r"\[([\d,\s]+)\]",
         lambda m: "[" + ", ".join(re.findall(r"\d+", m.group(1))) + "]",

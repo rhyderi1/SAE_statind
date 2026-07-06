@@ -84,16 +84,10 @@ with torch.no_grad():
         if batch_max > max_val:
             max_val = batch_max
 
-if max_val == 0.0:
-    max_val = 1.0
-# The original computed max_val as Z_final.max() on a float32 numpy array, so it was a
-# np.float32 scalar. np.histogram's bin-edge computation picks up that dtype and rounds
-# edges to float32 precision as a result. Match that dtype here so bin_edges -- and thus
-# the reported bin_range values -- are byte-identical to the original, not just
-# equivalent up to float64 rounding noise.
+# if max_val == 0.0:
+#     max_val = 1.0
 max_val = np.float32(max_val)
 
-# Same bin edges np.histogram(..., bins=num_bins, range=(0.0, max_val)) would produce.
 _, bin_edges = np.histogram(np.array([], dtype=np.float32), bins=num_bins, range=(0.0, max_val))
 feature_edges = np.arange(n_features + 1)
 
@@ -110,9 +104,6 @@ with torch.no_grad():
         Z = encode_batch(activation_store)
 
         nz_mask = Z != 0
-        # z_histogram.py does Z[Z != 0], which flattens and discards which
-        # feature column each surviving value came from. nonzero() instead
-        # gives us (row, col) pairs so we can keep feat_idx aligned with Z_act.
         row_idx, feat_idx = nz_mask.nonzero(as_tuple=True)
         Z_act = Z[row_idx, feat_idx].cpu().numpy()
         feat_idx = feat_idx.cpu().numpy()
@@ -124,10 +115,6 @@ with torch.no_grad():
         joint_counts += batch_joint
 
 num_zeros = num_entries - num_nonzero
-# z_histogram.py's plotted histogram is over ALL entries, not just the
-# active ones: it computes bins from the nonzero values, then stuffs the
-# zero count into bin 0 with `counts[0] += num_zeros`. Match that here so
-# bin_total_count reflects the same "all entries" histogram being analyzed.
 counts[0] += num_zeros
 
 # Per-latent zero counts, so bin 0 can get the same "all entries" treatment
