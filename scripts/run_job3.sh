@@ -2,8 +2,9 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=1:00:00
-#SBATCH --job-name=dtdxztz_scatter_simple
+#SBATCH --time=4:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --job-name=zizj_scatter_save
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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
@@ -19,4 +20,5 @@ mkdir -p logs
 
 export HF_HOME="/scratch/rhyderi1/hf_home"
 
-python src/dtdxztz_scatter_simple.py
+python src/zizj_scatter2.py \
+    --save 

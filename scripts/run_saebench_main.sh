@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --account=aip-bahtol
 #SBATCH --gpus-per-node=1
+#SBATCH --gres=gpu:1
 #SBATCH --mem=64G
 #SBATCH --time=03:00:00
 #SBATCH --output=%x_%j.out

@@ -53,7 +53,24 @@
       "Bash(scp /tmp/claude-1000/-home-razah-vulcan-sae-statind/3e0b29b8-d887-4feb-801a-776b9f76c720/scratchpad/leak_check.sh vulcan:/project/aip-bahtol/rhyderi1/sae_statind/scratch_verify/leak_check32.sh)",
       "Bash(xargs ls -lt)",
       "Bash(awk '{print $6, $7, $8, $9}')",
-      "Bash(awk '{print $6,$7,$8,$9}')"
+      "Bash(awk '{print $6,$7,$8,$9}')",
+      "WebFetch(domain:arxiv.org)",
+      "Bash(awk 'NR>=26900 && NR<=27045' .venv/lib/python3.11/site-packages/sae_lens/pretrained_saes.yaml)",
+      "Bash(awk 'NR>=28871 && NR<29860' .venv/lib/python3.11/site-packages/sae_lens/pretrained_saes.yaml)",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=10 vulcan \"echo OK; ls /project/aip-bahtol/rhyderi1/sae_statind | head\")",
+      "Bash(scp -q /tmp/claude-1000/-home-razah-vulcan-sae-statind/af1748a1-3bae-4e51-ae32-d3d0146c0e8f/scratchpad/count_sd.py vulcan:/tmp/count_sd.py)",
+      "Bash(grep -v \"^ *$\")",
+      "Bash(printf 'echo ran-with: \"$@\"\\\\n            --save \\\\n')",
+      "Bash(bash t.sh)",
+      "Bash(bash -n scripts/run_job3.sh)",
+      "Bash(scp -q /tmp/claude-1000/-home-razah-vulcan-sae-statind/af1748a1-3bae-4e51-ae32-d3d0146c0e8f/scratchpad/check_bos.py vulcan:/tmp/check_bos.py)",
+      "Bash(grep -viE \"warn|it/s|^\\\\s*$|%\\\\|\")",
+      "Bash(grep -vE \"^\\\\s*$\")",
+      "Bash(pkill -f \"frac rows starting w BOS\")",
+      "Bash(bash -n scripts/run_job.sh)",
+      "Bash(bash -x -c 'python\\(\\) { echo \"argv: $*\"; }; source scripts/run_job.sh')",
+      "Bash(scp -q /tmp/claude-1000/-home-razah-vulcan-sae-statind/af1748a1-3bae-4e51-ae32-d3d0146c0e8f/scratchpad/test_roundtrip.py vulcan:/tmp/test_roundtrip.py)",
+      "Bash(scp -q /tmp/claude-1000/-home-razah-vulcan-sae-statind/af1748a1-3bae-4e51-ae32-d3d0146c0e8f/scratchpad/check_words.py vulcan:/tmp/check_words.py)"
     ]
   }
 }

@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=32
+#SBATCH --gres=gpu:1
 #SBATCH --mem=64G
 #SBATCH --time=8:00:00
 #SBATCH --output=logs/%x-%j.out

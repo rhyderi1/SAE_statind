@@ -2,6 +2,7 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
+#SBATCH --gres=gpu:1
 #SBATCH --time=4:00:00
 #SBATCH --job-name=feature_z_hist
 #SBATCH --output=logs/%x-%j.out
