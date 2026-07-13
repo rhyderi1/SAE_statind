@@ -11,7 +11,7 @@ source /project/aip-bahtol/rhyderi1/sae_statind/.venv/bin/activate
 export HF_TOKEN=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   
 
 python -m sae_bench.evals.absorption.main \
-  --sae_regex_pattern "sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109" \
-  --sae_block_pattern "blocks.12.hook_resid_post__trainer_0" \
+  --sae_regex_pattern "gemma-scope-2b-pt-res" \
+  --sae_block_pattern "layer_3/width_16k/average_l0_59" \
   --model_name gemma-2-2b 
 

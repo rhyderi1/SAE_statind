@@ -70,7 +70,10 @@
       "Bash(bash -n scripts/run_job.sh)",
       "Bash(bash -x -c 'python\\(\\) { echo \"argv: $*\"; }; source scripts/run_job.sh')",
       "Bash(scp -q /tmp/claude-1000/-home-razah-vulcan-sae-statind/af1748a1-3bae-4e51-ae32-d3d0146c0e8f/scratchpad/test_roundtrip.py vulcan:/tmp/test_roundtrip.py)",
-      "Bash(scp -q /tmp/claude-1000/-home-razah-vulcan-sae-statind/af1748a1-3bae-4e51-ae32-d3d0146c0e8f/scratchpad/check_words.py vulcan:/tmp/check_words.py)"
+      "Bash(scp -q /tmp/claude-1000/-home-razah-vulcan-sae-statind/af1748a1-3bae-4e51-ae32-d3d0146c0e8f/scratchpad/check_words.py vulcan:/tmp/check_words.py)",
+      "Bash(echo \"== exit $? ==\")",
+      "Bash(awk '/\"s_abs\"/,0' results/absorption_sets_relu_layer12_k20_20260703_110221.json)",
+      "Bash(awk '/^    \"s\": \\\\[/,/^    \\\\],?$/')"
     ]
   }
 }

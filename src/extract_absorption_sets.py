@@ -22,9 +22,9 @@ import pandas as pd
 from infer_z import SAE_DATA
 
 # --- parameters ---
-ARCH = "relu"
-LAYER = 12
-SPARSITY = "20"
+ARCH = "jumprelu"
+LAYER = 3
+SPARSITY = "59"
 release, sae_id = SAE_DATA[LAYER][ARCH][SPARSITY]
 
 folder_name = f"{release}_{sae_id}"
