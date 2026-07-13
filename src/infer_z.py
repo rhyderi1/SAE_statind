@@ -20,6 +20,11 @@ now = datetime.now()
 YLIM = (1e-4, 1e10)
 
 SAE_DATA = {
+    3: {
+        "jumprelu": {
+            "59": ("gemma-scope-2b-pt-res", "layer_3/width_16k/average_l0_59")
+        }
+    },
     12: {
         "relu": {
             "20": ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_0"),

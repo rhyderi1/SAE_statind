@@ -25,13 +25,13 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 dataset = 'NeelNanda/pile-10k'
 context_size = 128
 batch_size = 32
-n_batches = 600 # not 1209
+n_batches = 1209 # not 1209
 
 ARCH = "relu"
 LAYER = 12
 SPARSITY = "20"
 PAIRS = [
-    (477,10069), #Absorbed, paper example
+    (477,10069), #Absorbed, code example
     
 ]
 MARKER_SIZE = 2.5
