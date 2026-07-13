@@ -26,14 +26,18 @@ batch_size = 32
 Arch = "jumprelu"
 Sparsity = "59"
 Layer = 3
-num_batches = 1209
+num_batches = 3
 hook_name = f"blocks.{Layer}.hook_resid_post"
 
 release, sae_id = SAE_DATA[Layer][Arch][Sparsity]
 
+#Claude: from_pretrained defaults to device="cpu", which left Z on CPU while the model's
+#Claude: batch_tokens (and the hits mask built from them) were on CUDA -> index/tensor
+#Claude: device mismatch at Z[hits]. Load the SAE onto the same device as the model.
 sae = SAE.from_pretrained(
     release=release,
-    sae_id=sae_id
+    sae_id=sae_id,
+    device=device,
 )
 
 model = HookedTransformer.from_pretrained_no_processing(
@@ -117,7 +121,7 @@ with torch.no_grad():
             if hits.any():
                 #Claude: hits.reshape(-1) is flattened the same way as Z, so it selects the
                 #Claude: correct rows; .cpu() keeps GPU memory flat across 1209 batches.
-                saved[word].append(Z[hits.reshape(-1)].cpu())
+                saved[word].append(Z[hits.reshape(-1).to(Z.device)].cpu())
 
 # for word in target_words:
 #     word_set = [word, " " + word]
