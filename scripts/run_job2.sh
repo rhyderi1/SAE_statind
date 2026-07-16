@@ -2,7 +2,7 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=1:00:00
+#SBATCH --time=4:00:00
 #SBATCH --gres=gpu:1
 #SBATCH --job-name=fig6
 #SBATCH --output=logs/%x-%j.out
@@ -20,4 +20,6 @@ mkdir -p logs
 
 export HF_HOME="/scratch/rhyderi1/hf_home"
 
-python src/chanin_fig6.py
+python src/zizj_scatter.py \
+    --save \
+    --plot

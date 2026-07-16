@@ -27,12 +27,19 @@ context_size = 128
 batch_size = 32
 n_batches = 1209 # not 1209
 
-ARCH = "relu"
-LAYER = 12
-SPARSITY = "20"
+ARCH = "jumprelu"
+LAYER = 3
+SPARSITY = "59"
 PAIRS = [
-    (477,10069), #Absorbed, code example
-    
+    # top 3 absorption pairs (main, absorber) — one per letter
+    (16033, 12304),   # u
+    (5407,  10622),   # e
+    (1006,  731),     # o
+    (6510, 1085),
+    # 3 control pairs: same absorber j, but a different letter's main i
+    (9795,  12304),   # b-main vs u-absorber
+    (11993, 10622),   # k-main vs e-absorber
+    (1024,  731),     # j-main vs o-absorber
 ]
 MARKER_SIZE = 2.5
 ALPHA = 0.3
@@ -73,10 +80,10 @@ def collect_columns(pairs, n_batches, batch_size, context_size):
     latents = wanted_latents(pairs)
 
     hook_name = f'blocks.{LAYER}.hook_resid_post'
-    # SAE_RELEASE = "gemma-scope-2b-pt-res"
-    # SAE_ID = "layer_3/width_16k/average_l0_59"   # the paper's exact checkpoint (L0=59)
-    SAE_RELEASE = "sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109"
-    SAE_ID = "blocks.12.hook_resid_post__trainer_0"   # the paper's exact checkpoint (L0=59)
+    SAE_RELEASE = "gemma-scope-2b-pt-res"
+    SAE_ID = "layer_3/width_16k/average_l0_59"   # the paper's exact checkpoint (L0=59)
+    #SAE_RELEASE = "sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109"
+    #SAE_ID = "blocks.12.hook_resid_post__trainer_0"   # the paper's exact checkpoint (L0=59)
     sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device=device)
 
     model = HookedTransformer.from_pretrained_no_processing(

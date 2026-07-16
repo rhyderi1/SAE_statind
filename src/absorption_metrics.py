@@ -18,9 +18,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 dataset = 'NeelNanda/pile-10k'
 context_size = 128
 batch_size = 32
-Arch = "relu"
-Sparsity = "20"
-Layer = 12
+Arch = "jumprelu"
+Sparsity = "59"
+Layer = 3
 num_batches = 3820
 hook_name = f"blocks.{Layer}.hook_resid_post"
 release, sae_id = SAE_DATA[Layer][Arch][Sparsity]
@@ -29,23 +29,23 @@ Eps = 1E-8
 total_tokens = num_batches * batch_size * context_size # ~15M
 
 latent_pairs = [
-    # top 3 absorption pairs (from absorption sets dict)(only 1 per letter)
-    (4014,15370),
-    (477, 10069),
-    (7985,3645),
-    # 3 non-absorption pairs (chose absorbers of other letters)
-    (2205,15370),
-    (16092,10069),
-    (4183,3645)
+    # top 3 absorption pairs (main, absorber) — one per letter
+    (16033, 12304),   # u
+    (5407,  10622),   # e
+    (1006,  731),     # o
+    (6510, 1085),
+    # 3 control pairs: same absorber j, but a different letter's main i
+    (9795,  12304),   # b-main vs u-absorber
+    (11993, 10622),   # k-main vs e-absorber
+    (1024,  731),     # j-main vs o-absorber
 ]
-
 pair_stats = {
     pair: {
         "i_count": 0,
         "j_count": 0,
-        "i_given_j_count": 0,
+        "i_and_j_count": 0,
         "i_sum": 0.0,
-        "i_given_j_sum": 0.0
+        "i_and_j_sum": 0.0,
     } for pair in latent_pairs
 }
 
@@ -70,6 +70,7 @@ activation_store = ActivationsStore.from_sae(
 )
 
 print(f"Starting processing for {num_batches} batches...")
+print(f"Layer {Layer}, {Arch}, sparsity {Sparsity}")
 
 with torch.no_grad():
     for batch in range(num_batches):
@@ -98,10 +99,10 @@ with torch.no_grad():
 
             pair_stats[(latent_i, latent_j)]["i_count"] += i_active.sum().item()
             pair_stats[(latent_i, latent_j)]["j_count"] += j_active.sum().item()
-            pair_stats[(latent_i, latent_j)]["i_given_j_count"] += (i_active & j_active).sum().item()
+            pair_stats[(latent_i, latent_j)]["i_and_j_count"] += (i_active & j_active).sum().item()
 
-            pair_stats[(latent_i, latent_j)]["i_sum"] += Z_i.sum().item()
-            pair_stats[(latent_i, latent_j)]["i_given_j_sum"] += Z_i[j_active].sum().item()
+            pair_stats[(latent_i, latent_j)]["i_sum"] += Z_i[i_active].sum().item()
+            pair_stats[(latent_i, latent_j)]["i_and_j_sum"] += Z_i[i_active & j_active].sum().item()
 
 
 for latent_i, latent_j in latent_pairs:
@@ -109,31 +110,25 @@ for latent_i, latent_j in latent_pairs:
     
     i_count = stats["i_count"]
     j_count = stats["j_count"]
-    i_given_j_count = stats["i_given_j_count"]
+    i_and_j_count = stats["i_and_j_count"]
     i_sum = stats["i_sum"]
-    i_given_j_sum = stats["i_given_j_sum"]
+    i_and_j_sum = stats["i_and_j_sum"]
 
-    if j_count == 0:
+    if i_count == 0 or i_and_j_count ==0:
         print(f"\nLatent i: {latent_i}\nLatent j: {latent_j}")
         print("ERROR: j_count is 0. Computations undefined.\n")
         continue
 
     # Probabilities
-    prob_i = i_count / total_tokens
-    prob_j = j_count / total_tokens
-    prob_i_given_j = (i_given_j_count / j_count) if j_count > 0 else 0.0
+    mean_zi_zi_active = i_sum/i_count
+    mean_zi_zizj_active = i_and_j_sum/i_and_j_count
+    prob_zj_zi_active = i_and_j_count/i_count
 
-    # Expectations
-    expectation_i = (1/total_tokens) * i_sum
-    expectation_i_given_j = (i_given_j_sum / j_count) if j_count > 0 else 0.0
 
-    # Metrics
-    Absorption_Metric1 = prob_i_given_j < prob_i
-    Absorption_Metric2 = expectation_i_given_j < expectation_i
-    Absorption_Metric3 = ((expectation_i - expectation_i_given_j) / (expectation_i + Eps)) * prob_j
+    Absorption_Metric3 = ((mean_zi_zi_active - mean_zi_zizj_active)/(mean_zi_zi_active + Eps)) * prob_zj_zi_active
 
     # Print formatting identical to your request
     print(f'\nLatent i: {latent_i}\nLatent j: {latent_j}')
-    print(f'Metric 1: {Absorption_Metric1}')
-    print(f'Metric 2: {Absorption_Metric2}')
+    #print(f'Metric 1: {Absorption_Metric1}')
+    #print(f'Metric 2: {Absorption_Metric2}')
     print(f'Metric 3: {Absorption_Metric3:.6f}\n')
