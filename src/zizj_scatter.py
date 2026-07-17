@@ -1,108 +1,90 @@
 '''
-z_i vs z_j scatter, from a saved Z matrix.
+z_i vs z_j scatter for the latent pairs in PAIRS.
 
-Two modes, selected by flags (at least one required):
-  --save   stream the corpus, extract the z columns for the latents in PAIRS,
-           and write one .pt per latent (labeled with its latent index)
-  --plot   scatter the pairs. Reads the saved per-latent .pt files when a run
-           covering every latent is found, otherwise streams the corpus itself.
+  --save   stream the corpus and write one .pt per latent (plus the token ids)
+  --plot   scatter each pair; reuses saved .pt files when one --save run covers
+           every latent in PAIRS, otherwise streams the corpus itself
+Passing both streams once, saves, and plots.
 
-Passing both collects once, saves, and plots from what it just collected.
+Red points: every occurrence of a token that appeared in a full-absorption
+event of j under i's letter (from the newest absorption_sets JSON in results/).
+Pairs where j never absorbs from i's letter get no red points.
 '''
 
 import argparse
+import json
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import torch
 from pathlib import Path
 from datetime import datetime
-from sae_lens import SAE
+from sae_lens import SAE, ActivationsStore
 from transformer_lens import HookedTransformer
-from sae_lens import ActivationsStore
+from transformers import AutoTokenizer
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dataset = 'NeelNanda/pile-10k'
 context_size = 128
 batch_size = 32
-n_batches = 1209 # not 1209
+n_batches = 1209
 
 ARCH = "jumprelu"
 LAYER = 3
 SPARSITY = "59"
+SAE_RELEASE = "gemma-scope-2b-pt-res"
+SAE_ID = "layer_3/width_16k/average_l0_59"   # the paper's exact checkpoint (L0=59)
+
 PAIRS = [
-    # top 3 absorption pairs (main, absorber) — one per letter
-    (16033, 12304),   # u
-    (5407,  10622),   # e
-    (1006,  731),     # o
-    (6510, 1085),
-    # 3 control pairs: same absorber j, but a different letter's main i
-    (9795,  12304),   # b-main vs u-absorber
-    (11993, 10622),   # k-main vs e-absorber
-    (1024,  731),     # j-main vs o-absorber
+    # fixed main i = 6840 ('g'), varied child j
+    (6840, 2141),    # absorber x57
+    (6840, 2809),
+    (6840, 5904),
+    (6840, 7852),
+    # controls: absorbers of other letters
+    (6840, 10622),
+    (6840, 12353),
+    (6840, 8480),
+    (6840, 2240),
 ]
-MARKER_SIZE = 2.5
-ALPHA = 0.3
 
 REPO_ROOT = Path(__file__).parent.parent
 Z_DIR = REPO_ROOT / "data" / "Z" / "zizj_pairs"
+FIG_DIR = REPO_ROOT / "figures"
+
+LATENTS = sorted({latent for pair in PAIRS for latent in pair})
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--save", action="store_true",
-                        help="collect the z columns for PAIRS and write them to a .pt")
-    parser.add_argument("--plot", action="store_true",
-                        help="scatter the pairs")
-    parser.add_argument("--z_dir", type=str, default=None,
-                        help="with --plot alone: read the per-latent .pt files from "
-                             "this directory instead of streaming. Defaults to Z_DIR.")
-    parser.add_argument("--n_batches", type=int, default=n_batches)
-    parser.add_argument("--batch_size", type=int, default=batch_size)
-    parser.add_argument("--context_size", type=int, default=context_size)
-    return parser.parse_args()
+def latent_file(latent, ts):
+    return f"zi_latent{latent}_{ARCH}_layer{LAYER}_k{SPARSITY}_{ts}.pt"
 
 
-def wanted_latents(pairs):
-    latents = []
-    for (i, j) in pairs:
-        if i not in latents:
-            latents.append(i)
-        if j not in latents:
-            latents.append(j)
-    return latents
+def tokens_file(ts):
+    return f"tokens_{ARCH}_layer{LAYER}_k{SPARSITY}_{ts}.pt"
 
 
-# 1) Stream batches
+# 1) Stream the corpus and pull out the z columns
 
-def collect_columns(pairs, n_batches, batch_size, context_size):
-    """Stream the corpus and return {latent: (tokens,) float tensor on CPU}."""
-    latents = wanted_latents(pairs)
-
+def collect_columns():
+    """Returns ({latent: (tokens,) tensor}, (tokens,) tensor of token ids)."""
     hook_name = f'blocks.{LAYER}.hook_resid_post'
-    SAE_RELEASE = "gemma-scope-2b-pt-res"
-    SAE_ID = "layer_3/width_16k/average_l0_59"   # the paper's exact checkpoint (L0=59)
-    #SAE_RELEASE = "sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109"
-    #SAE_ID = "blocks.12.hook_resid_post__trainer_0"   # the paper's exact checkpoint (L0=59)
     sae = SAE.from_pretrained(release=SAE_RELEASE, sae_id=SAE_ID, device=device)
-
     model = HookedTransformer.from_pretrained_no_processing(
         default_prepend_bos=True,
         model_name="gemma-2-2b",
-        device=device
+        device=device,
     )
-    activation_store = ActivationsStore.from_sae(
-        model,
-        sae,
-        context_size=context_size,
-        dataset=dataset,
-    )
+    store = ActivationsStore.from_sae(
+        model, sae, context_size=context_size, dataset=dataset)
 
-    batches_per_latent = {latent: [] for latent in latents}
-
+    cols = {latent: [] for latent in LATENTS}
+    toks = []
     with torch.no_grad():
-        for batch_num in range(n_batches):
-            batch_tokens = activation_store.get_batch_tokens(batch_size)
+        for _ in range(n_batches):
+            batch_tokens = store.get_batch_tokens(batch_size)
+            # flattened the same way as Z below, so row t of every z column
+            # belongs to token toks[t]
+            toks.append(batch_tokens.reshape(-1).cpu())
 
             _, cache = model.run_with_cache(
                 batch_tokens,
@@ -110,204 +92,147 @@ def collect_columns(pairs, n_batches, batch_size, context_size):
                 stop_at_layer=LAYER + 1,
                 prepend_bos=False,
             )
-            X = cache[hook_name]
-            del cache
+            X = cache[hook_name].to(device=sae.W_enc.device, dtype=sae.W_enc.dtype)
+            Z = sae.encode(X).reshape(-1, sae.cfg.d_sae)   # (tokens, d_sae)
+            for latent in LATENTS:
+                # .clone() keeps just this small column; a plain slice would
+                # hold the whole (tokens, 16k) Z matrix alive in memory
+                cols[latent].append(Z[:, latent].clone().cpu())
 
-            X_sae = X.to(device=sae.W_enc.device, dtype=sae.W_enc.dtype)
-            Z = sae.encode(X_sae)
-            Z = Z.reshape(-1, Z.shape[-1])  # (tokens, d_sae)
-
-            for latent in latents:
-                # .clone() so we keep a small (tokens,) column, not the entire Z matrix
-                batches_per_latent[latent].append(Z[:, latent].detach().clone().cpu())
-            del Z
-
-    columns = {}
-    for latent in latents:
-        columns[latent] = torch.cat(batches_per_latent[latent]).float()
-    return columns
+    columns = {latent: torch.cat(c).float() for latent, c in cols.items()}
+    token_ids = torch.cat(toks).long()
+    return columns, token_ids
 
 
-def latent_filename(latent, ts):
-    return f"zi_latent{latent}_{ARCH}_layer{LAYER}_k{SPARSITY}_{ts}.pt"
-
-
-def latent_glob(latent):
-    return f"zi_latent{latent}_{ARCH}_layer{LAYER}_k{SPARSITY}_*.pt"
-
-
-def save_columns(columns, pairs, n_batches, batch_size, context_size):
-    """Write one .pt per latent, each labeled with its latent index.
-
-    Every file from a single run shares a timestamp, so load_columns can tell
-    which columns were streamed together. Returns the list of paths.
-    """
+def save_columns(columns, token_ids):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     Z_DIR.mkdir(parents=True, exist_ok=True)
-
-    paths = []
     for latent, z in columns.items():
-        out_path = Z_DIR / latent_filename(latent, ts)
-        torch.save(
-            {
-                "latent": latent,
-                "z": z,
-                "pairs": pairs,
-                "arch": ARCH,
-                "layer": LAYER,
-                "sparsity": SPARSITY,
-                "dataset": dataset,
-                "n_batches": n_batches,
-                "batch_size": batch_size,
-                "context_size": context_size,
-                "timestamp": ts,
-            },
-            out_path,
-        )
-        print(f"Saved -> {out_path}  (latent {latent}, {z.numel()} tokens)")
-        paths.append(out_path)
-    return paths
+        torch.save({"latent": latent, "z": z, "timestamp": ts},
+                   Z_DIR / latent_file(latent, ts))
+    torch.save({"token_ids": token_ids, "timestamp": ts},
+               Z_DIR / tokens_file(ts))
+    print(f"Saved run {ts} -> {Z_DIR}")
 
 
-def _run_timestamp(name, latent):
-    """Pull the trailing YYYYmmdd_HHMMSS out of a per-latent filename."""
-    stem = Path(name).stem
-    prefix = f"zi_latent{latent}_{ARCH}_layer{LAYER}_k{SPARSITY}_"
-    return stem[len(prefix):]
-
-
-def load_columns(latents, z_dir=None):
-    """Load one column per latent from the newest run that has all of them.
-
-    Returns {latent: (tokens,) tensor}, or None when no such run exists.
-    """
-    z_dir = Z_DIR if z_dir is None else Path(z_dir)
-    if not z_dir.is_dir():
-        raise SystemExit(f"No such directory: {z_dir}")
-
-    # timestamps present for each latent, then the newest one common to all
-    per_latent = {
-        latent: {_run_timestamp(p.name, latent) for p in z_dir.glob(latent_glob(latent))}
-        for latent in latents
-    }
-    missing = [latent for latent, ts_set in per_latent.items() if not ts_set]
-    if missing:
-        print(f"No saved columns in {z_dir} for latent(s): {missing}")
-        return None
-
-    common = set.intersection(*per_latent.values())
+def load_columns():
+    """Newest --save run that has every latent in LATENTS"""
+    if not Z_DIR.is_dir():
+        return None, None
+    # every file of one run shares its trailing YYYYmmdd_HHMMSS timestamp;
+    # keep the newest timestamp present for all latents
+    runs_per_latent = [
+        {"_".join(p.stem.split("_")[-2:])
+         for p in Z_DIR.glob(latent_file(latent, "*"))}
+        for latent in LATENTS
+    ]
+    common = set.intersection(*runs_per_latent)
     if not common:
-        print(f"No single run in {z_dir} covers all of {latents}; "
-              f"re-run with --save to collect them together.")
-        return None
+        print("No saved run covers every latent in PAIRS; streaming instead.")
+        return None, None
     ts = max(common)
 
-    columns = {}
-    for latent in latents:
-        path = z_dir / latent_filename(latent, ts)
-        blob = torch.load(path, map_location="cpu")
-        columns[latent] = blob["z"]
-        print(f"Loaded <- {path}  (latent {latent}, n_batches={blob['n_batches']})")
-    return columns
+    columns = {
+        latent: torch.load(Z_DIR / latent_file(latent, ts), map_location="cpu")["z"]
+        for latent in LATENTS
+    }
+    tok_path = Z_DIR / tokens_file(ts)
+    token_ids = (torch.load(tok_path, map_location="cpu")["token_ids"]
+                 if tok_path.exists() else None)
+    print(f"Loaded run {ts} <- {Z_DIR}")
+    return columns, token_ids
 
 
-#2) Compute joint-support means/stds and on-support Pearson r, then standardize
+# 2) Which token ids get painted red for each pair
 
-def joint_support_stats(zi, zj):
-    """
-    Joint-support means/stds and on-support Pearson r, all computed over the
-    joint support (tokens where BOTH latents are active). Fully vectorized.
-    Returns (mean_i, std_i, mean_j, std_j) as tensors, plus (r, n).
-    """
-    m = (zi > 0) & (zj > 0)
-    n = int(m.sum().item())
+def absorbed_token_ids():
+    pattern = f"absorption_sets_{ARCH}_layer{LAYER}_k{SPARSITY}_*.json"
+    candidates = sorted((REPO_ROOT / "results").glob(pattern))
+    if not candidates:
+        print("No absorption_sets JSON in results/; skipping red coloring.")
+        return {}
+    with open(candidates[-1]) as f:
+        blob = json.load(f)
+    print(f"Coloring absorption events from {candidates[-1]}")
 
-    zi_m, zj_m = zi[m], zj[m]
-    mean_i, mean_j = zi_m.mean(), zj_m.mean()
-    di, dj = zi_m - mean_i, zj_m - mean_j
+    tok_map = blob["s_abs_tokens"]          # letter -> {absorber j -> [tokens]}
+    letter_of = {m: L for L, mains in blob["s_main"].items() for m in mains}
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b")
 
-    std_i = di.square().mean().sqrt().clamp_min(1e-8)
-    std_j = dj.square().mean().sqrt().clamp_min(1e-8)
+    out = {}
+    for i, j in PAIRS:
+        tokens = sorted(set(tok_map.get(letter_of.get(i), {}).get(str(j), [])))
+        if not tokens:
+            print(f"pair ({i}, {j}): j never absorbs from i's letter -- no red")
+            continue
+        # map each token string back to its token id so its occurrences can be
+        # found in the stream; strings that encode to >1 id can't be matched
+        ids = [enc[0] for s in tokens
+               if len(enc := tokenizer.encode(s, add_special_tokens=False)) == 1]
+        out[(i, j)] = {"ids": torch.tensor(sorted(ids)), "tokens": tokens}
+        print(f"pair ({i}, {j}): {len(tokens)} absorbed tokens -> {len(ids)} ids")
+    return out
 
 
-    #compute R value
-    denom = di.square().sum().sqrt() * dj.square().sum().sqrt()
-    r = float((di * dj).sum() / denom) if denom > 0 else float("nan")
+# 3) One scatter per pair
 
-    return mean_i, std_i, mean_j, std_j, r, n
-
-
-# 3) Plot: one row per pair, RAW panel only
-
-def plot_columns(columns, pairs):
-    n_pairs = len(pairs)
-    fig, axes = plt.subplots(n_pairs, 1, figsize=(3.8, 3.4 * n_pairs), squeeze=False)
-
-    for row in range(n_pairs):
-        i, j = pairs[row]
-        zi = columns[i].to(device)
-        zj = columns[j].to(device)
-
-        mean_i, std_i, mean_j, std_j, r, coact_count = joint_support_stats(zi, zj)
-
-        # Drop ONLY the exact (0,0) origin; keep every other point.
-        keep = (zi != 0) | (zj != 0)
-        n_plotted = int(keep.sum().item())
-        total_tokens = int(zi.numel())
-        print(
-            f"pair (z_{i}, z_{j}): plotted {n_plotted} points "
-            f"(co-active={coact_count}, total tokens={total_tokens})"
-        )
-
-        raw_x = zi[keep].cpu().numpy()
-        raw_y = zj[keep].cpu().numpy()
-        ax_raw = axes[row][0]
-        ax_raw.plot(raw_x, raw_y, "o", ms=0.1, alpha=0.3)
-
-        ax_raw.axhline(0, lw=0.6, color="0.55")
-        ax_raw.axvline(0, lw=0.6, color="0.55")
-        ax_raw.set_xlabel(f"z_{i}")
-        ax_raw.set_ylabel(f"z_{j}")
-        ax_raw.set_title(f"z_{i} vs z_{j} -- RAW (co-act={coact_count}, on-supp r={r:+.2f})", fontsize=9)
-
-    fig.suptitle(f"z_i vs z_j, raw (Arch={ARCH}, layer={LAYER}, k={SPARSITY})", y=1.0, fontsize=11)
-    fig.tight_layout()
-
+def plot_pairs(columns, token_ids, abs_ids):
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = (
-        REPO_ROOT
-        / "figures"
-        / f"zizj_scatter_{ARCH}_layer{LAYER}_k{SPARSITY}_{ts}.png"
-    )
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=160, bbox_inches="tight")
-    plt.close(fig)
+    FIG_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"Saved -> {out_path}")
-    return out_path
+    for i, j in PAIRS:
+        zi, zj = columns[i], columns[j]
+        coact = int(((zi > 0) & (zj > 0)).sum())
+        keep = (zi != 0) | (zj != 0)        # drop only the exact (0,0) points
+
+        abs_info = abs_ids.get((i, j))
+        red = None
+        if abs_info is not None and token_ids is not None:
+            red = torch.isin(token_ids, abs_info["ids"]) & keep
+
+        fig, ax = plt.subplots(figsize=(3.8, 3.4))
+        base = keep if red is None else keep & ~red
+        ax.plot(zi[base].numpy(), zj[base].numpy(), "o", ms=0.1, alpha=0.3)
+        if red is not None:
+            n_red = int(red.sum())
+            name = (f"'{abs_info['tokens'][0]}'" if len(abs_info["tokens"]) == 1
+                    else f"{len(abs_info['tokens'])} tokens")
+            ax.plot(zi[red].numpy(), zj[red].numpy(), "o", ms=1.5, alpha=0.8,
+                    color="red", zorder=3,
+                    label=f"{name}, total {n_red} occurrences")
+            ax.legend(loc="upper right", fontsize=6, markerscale=4)
+
+        ax.axhline(0, lw=0.6, color="0.55")
+        ax.axvline(0, lw=0.6, color="0.55")
+        ax.set_xlabel(f"z_{i}")
+        ax.set_ylabel(f"z_{j}")
+        ax.set_title(f"z_{i} vs z_{j} ({ARCH} layer {LAYER} k={SPARSITY}, "
+                     f"co-act={coact})", fontsize=9)
+        fig.tight_layout()
+
+        out = FIG_DIR / f"zizj_scatter_{ARCH}_layer{LAYER}_k{SPARSITY}_pair{i}_{j}_{ts}.png"
+        fig.savefig(out, dpi=160, bbox_inches="tight")
+        plt.close(fig)
+        print(f"pair ({i}, {j}): co-active={coact} -> {out.name}")
 
 
 def main():
-    args = parse_args()
-    if not args.save and not args.plot:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--save", action="store_true")
+    parser.add_argument("--plot", action="store_true")
+    args = parser.parse_args()
+    if not (args.save or args.plot):
         raise SystemExit("Nothing to do -- pass --save and/or --plot")
 
-    columns = None
-
-    # plot-only against saved columns: never load the model or the SAE
+    columns = token_ids = None
     if args.plot and not args.save:
-        columns = load_columns(wanted_latents(PAIRS), args.z_dir)
-
+        columns, token_ids = load_columns()
     if columns is None:
-        columns = collect_columns(
-            PAIRS, args.n_batches, args.batch_size, args.context_size
-        )
-
-    if args.save:
-        save_columns(columns, PAIRS, args.n_batches, args.batch_size, args.context_size)
-
+        columns, token_ids = collect_columns()
+        if args.save:
+            save_columns(columns, token_ids)
     if args.plot:
-        plot_columns(columns, PAIRS)
+        plot_pairs(columns, token_ids, absorbed_token_ids())
 
 
 if __name__ == "__main__":

@@ -2,9 +2,9 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=4:00:00
+#SBATCH --time=0:10:00
 #SBATCH --gres=gpu:1
-#SBATCH --job-name=fig6
+#SBATCH --job-name=zizj_red
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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
