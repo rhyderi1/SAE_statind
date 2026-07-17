@@ -52,7 +52,11 @@ REPO_ROOT = Path(__file__).parent.parent
 Z_DIR = REPO_ROOT / "data" / "Z" / "zizj_pairs"
 FIG_DIR = REPO_ROOT / "figures"
 
-LATENTS = sorted({latent for pair in PAIRS for latent in pair})
+LATENTS = set() # like a list, but prevents duplicates
+for pair in PAIRS:
+    for latent in pair:
+        LATENTS.add(latent)
+LATENTS = sorted(LATENTS) # deduplicated 'list' of all latents
 
 
 def latent_file(latent, ts):
@@ -77,14 +81,16 @@ def collect_columns():
     store = ActivationsStore.from_sae(
         model, sae, context_size=context_size, dataset=dataset)
 
-    cols = {latent: [] for latent in LATENTS}
+    cols = {}
+    for latent in LATENTS:
+        cols[latent] = []
     toks = []
     with torch.no_grad():
         for _ in range(n_batches):
             batch_tokens = store.get_batch_tokens(batch_size)
-            # flattened the same way as Z below, so row t of every z column
-            # belongs to token toks[t]
             toks.append(batch_tokens.reshape(-1).cpu())
+            # shape: batch_size, context_size --> batch_size * context_size 
+            # each row corresponds cleanly with each row of Z (individual tokens)
 
             _, cache = model.run_with_cache(
                 batch_tokens,
@@ -93,18 +99,27 @@ def collect_columns():
                 prepend_bos=False,
             )
             X = cache[hook_name].to(device=sae.W_enc.device, dtype=sae.W_enc.dtype)
-            Z = sae.encode(X).reshape(-1, sae.cfg.d_sae)   # (tokens, d_sae)
+            Z = sae.encode(X).reshape(-1, sae.cfg.d_sae)   # (tokens, p)
             for latent in LATENTS:
-                # .clone() keeps just this small column; a plain slice would
-                # hold the whole (tokens, 16k) Z matrix alive in memory
+                # .clone() saves memory instead of simple slicing (view)
                 cols[latent].append(Z[:, latent].clone().cpu())
+                # appends the column for that feature (all tokens)
+                # .append() makes sure we don't overwrite columsn for previous batches
+                # meaning each latent has (n_batches) cols (activations for those tokens)
 
-    columns = {latent: torch.cat(c).float() for latent, c in cols.items()}
+    columns = {}
+    for latent, c in cols.items():
+        columns[latent] = torch.cat(c).float()
+        # concatenates to 1 long vertical column per latent (all tokens)
     token_ids = torch.cat(toks).long()
-    return columns, token_ids
+    # 1 dimensional tensor of token ids (ie: tokenized words)
+    # concatenates to 1 long vertical column (all tokens)
+    #.long() saves to int64
+    return columns, token_ids # saves the dictionary with individual latent: activation columns
 
 
 def save_columns(columns, token_ids):
+    # saves the columns by index (separate plotting from computing)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     Z_DIR.mkdir(parents=True, exist_ok=True)
     for latent, z in columns.items():
@@ -116,26 +131,35 @@ def save_columns(columns, token_ids):
 
 
 def load_columns():
+    # Boolean: either run collect_columns() and save_columns() (if no timestamp intersection) or run load_columns()
     """Newest --save run that has every latent in LATENTS"""
     if not Z_DIR.is_dir():
         return None, None
     # every file of one run shares its trailing YYYYmmdd_HHMMSS timestamp;
     # keep the newest timestamp present for all latents
-    runs_per_latent = [
-        {"_".join(p.stem.split("_")[-2:])
-         for p in Z_DIR.glob(latent_file(latent, "*"))}
-        for latent in LATENTS
-    ]
-    common = set.intersection(*runs_per_latent)
+    runs_per_latent = []
+    for latent in LATENTS:
+        runs = set() # 1 set per latent, no duplicates
+        for p in Z_DIR.glob(latent_file(latent, "*")):
+            # .glob() is pattern matching. It looks for a file as described in latent_file function
+            # passing * into the timestamp means it doesn't matter what's there (take teh file regardless of timestamp)(wildcard)
+            runs.add("_".join(p.stem.split("_")[-2:]))
+            # split the file into underscore separated parts, and only save the last 2 (datestamp, and timestamp)
+        runs_per_latent.append(runs)
+    common = set.intersection(*runs_per_latent) 
+    # find a timestamp common to all saved runs for latents in question
+    # important: not sufficient that we have all latents saved but for differing (or even some (not all) matching) timestamps
+    # because tokens may not be exactly the same across timestamps (changed settings, shuffle, seed, etc...)
     if not common:
         print("No saved run covers every latent in PAIRS; streaming instead.")
         return None, None
-    ts = max(common)
+    ts = max(common) # if more than 1 common, take the most recent
 
-    columns = {
-        latent: torch.load(Z_DIR / latent_file(latent, ts), map_location="cpu")["z"]
-        for latent in LATENTS
-    }
+    columns = {}
+    for latent in LATENTS:
+        columns[latent] = torch.load(
+            Z_DIR / latent_file(latent, ts), map_location="cpu")["z"]
+            # latent_file saves a dict (see line 125 or in save_columns UDF). We only want the activations for a latent
     tok_path = Z_DIR / tokens_file(ts)
     token_ids = (torch.load(tok_path, map_location="cpu")["token_ids"]
                  if tok_path.exists() else None)
@@ -146,49 +170,68 @@ def load_columns():
 # 2) Which token ids get painted red for each pair
 
 def absorbed_token_ids():
+    '''
+    We want to find token ids for absorption events, so we can plot it on our scatter plots (in red)
+    '''
     pattern = f"absorption_sets_{ARCH}_layer{LAYER}_k{SPARSITY}_*.json"
-    candidates = sorted((REPO_ROOT / "results").glob(pattern))
+    # find absorption_sets dict with s_main, s_abs, # absorption events, and each token (may have mutiple absorptio occurrences)
+    candidates = sorted((REPO_ROOT / "results").glob(pattern)) # alpahbetical order is the same as chronological in this case!
+
     if not candidates:
         print("No absorption_sets JSON in results/; skipping red coloring.")
         return {}
-    with open(candidates[-1]) as f:
+    with open(candidates[-1]) as f: #open the newest absorption sets dict
         blob = json.load(f)
     print(f"Coloring absorption events from {candidates[-1]}")
 
-    tok_map = blob["s_abs_tokens"]          # letter -> {absorber j -> [tokens]}
-    letter_of = {m: L for L, mains in blob["s_main"].items() for m in mains}
+    tok_map = blob["s_abs_tokens"]          
+    # finds the s_abs_tokens part of the dict
+    # these tokens are stored as words (need to be tokenized)
+    letter_of = {} # get first letter for latents
+    for L, mains in blob["s_main"].items():
+        # create a reverse mapping of s_main. Instead of letter --> latent, latent --> letter
+        for m in mains:
+            letter_of[m] = L
+
     tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b")
 
     out = {}
     for i, j in PAIRS:
         tokens = sorted(set(tok_map.get(letter_of.get(i), {}).get(str(j), [])))
+        # get the starting letter of the s_main latent, the in s_abs, find that starting letters dict for latent j that absorbed it, 
+        # then for the absorber latent j in their, take the list of tokens where the absorption happened
         if not tokens:
             print(f"pair ({i}, {j}): j never absorbs from i's letter -- no red")
             continue
-        # map each token string back to its token id so its occurrences can be
-        # found in the stream; strings that encode to >1 id can't be matched
-        ids = [enc[0] for s in tokens
-               if len(enc := tokenizer.encode(s, add_special_tokens=False)) == 1]
+        ids = []
+        for s in tokens:
+            enc = tokenizer.encode(s, add_special_tokens=False)
+            if len(enc) == 1:
+                ids.append(enc[0]) # take only the first tokenized index if the tokenizer splits the words into multiple words (or should I ignore it altogether)
         out[(i, j)] = {"ids": torch.tensor(sorted(ids)), "tokens": tokens}
+        # maps absorber tokens with their ids (tokenized)
         print(f"pair ({i}, {j}): {len(tokens)} absorbed tokens -> {len(ids)} ids")
     return out
 
 
 # 3) One scatter per pair
 
-def plot_pairs(columns, token_ids, abs_ids):
+def plot_pairs(columns, token_ids, abs_ids): #abs_ids just takes out dict above
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     FIG_DIR.mkdir(parents=True, exist_ok=True)
 
     for i, j in PAIRS:
         zi, zj = columns[i], columns[j]
         coact = int(((zi > 0) & (zj > 0)).sum())
-        keep = (zi != 0) | (zj != 0)        # drop only the exact (0,0) points
+        keep = (zi != 0) | (zj != 0)        # drop only the exact (0,0) points, to increase plotting efficiency
 
         abs_info = abs_ids.get((i, j))
         red = None
         if abs_info is not None and token_ids is not None:
             red = torch.isin(token_ids, abs_info["ids"]) & keep
+            # important, we can't just use abs_info["ids"] because those are unique deduplicaetd token ids
+            # a absorber token may appear in multiple places, so we create a boolean mask of size (context_size * batch_size) ~ 4.95 M, 
+            # and see that at every position is the absorbed token there
 
         fig, ax = plt.subplots(figsize=(3.8, 3.4))
         base = keep if red is None else keep & ~red
