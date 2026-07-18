@@ -21,5 +21,4 @@ mkdir -p logs
 export HF_HOME="/scratch/rhyderi1/hf_home"
 
 python src/zizj_scatter.py \
-    --save \
     --plot

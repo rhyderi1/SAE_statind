@@ -16,12 +16,14 @@ import json
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from pathlib import Path
 from datetime import datetime
 from sae_lens import SAE, ActivationsStore
 from transformer_lens import HookedTransformer
 from transformers import AutoTokenizer
+import plotly.express as px
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 dataset = 'NeelNanda/pile-10k'
@@ -36,16 +38,7 @@ SAE_RELEASE = "gemma-scope-2b-pt-res"
 SAE_ID = "layer_3/width_16k/average_l0_59"   # the paper's exact checkpoint (L0=59)
 
 PAIRS = [
-    # fixed main i = 6840 ('g'), varied child j
-    (6840, 2141),    # absorber x57
-    (6840, 2809),
-    (6840, 5904),
-    (6840, 7852),
-    # controls: absorbers of other letters
-    (6840, 10622),
-    (6840, 12353),
-    (6840, 8480),
-    (6840, 2240),
+    (6510, 1085)
 ]
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -213,10 +206,74 @@ def absorbed_token_ids():
         print(f"pair ({i}, {j}): {len(tokens)} absorbed tokens -> {len(ids)} ids")
     return out
 
+def descriptive_stats(columns):
+    '''Per-pair descriptive metrics for the scatter panels.'''
+    stats = {}
+    for i, j in PAIRS:
+        zi, zj = columns[i], columns[j]
+        n_total = zi.numel()
+
+        i_on = zi > 0
+        j_on = zj > 0
+        both = i_on & j_on
+
+        n_i = int(i_on.sum())
+        n_j = int(j_on.sum())
+        n_coact = int(both.sum())
+        n_x_only = int((i_on & ~j_on).sum())
+        n_y_only = int((~i_on & j_on).sum())
+        n_support = int((i_on | j_on).sum())
+        assert n_x_only + n_y_only + n_coact == n_support
+
+        stats[(i, j)] = {
+            "n_total":     n_total,
+            "n_x_only":    n_x_only,
+            "n_y_only":    n_y_only,
+            "n_coact":     n_coact,
+            "n_support":   n_support,
+            "p_i":         n_i / n_total,
+            "p_j":         n_j / n_total,
+            "p_i_given_j": n_coact / n_j,
+            "p_j_given_i": n_coact / n_i,
+            "e_i":         float(zi.mean()),
+            "e_j":         float(zj.mean()),
+            "e_i_on_i":    float(zi[i_on].mean()),
+            "e_j_on_j":    float(zj[j_on].mean()),
+            "e_i_on_j":    float(zi[j_on].mean()),
+            "e_j_on_i":    float(zj[i_on].mean()),
+            "e_i_joint":   float(zi[both].mean()),
+            "e_j_joint":   float(zj[both].mean()),
+        }
+    return stats
+
+def stats_text(s): #turns stats into summary able to be plotted
+    return "\n".join([
+        "--- Summary Stats ---",
+        f"Total points:   {s['n_total']:,}",
+        f"X-axis points:  {s['n_x_only']:,}",
+        f"Y-axis points:  {s['n_y_only']:,}",
+        f"Co-active:      {s['n_coact']:,}",
+        f"Support:        {s['n_support']:,}",
+        "",
+        f"P(zi>0):        {s['p_i']:.4f}",
+        f"P(zj>0):        {s['p_j']:.4f}",
+        f"P(zi>0|zj>0):   {s['p_i_given_j']:.4f}",
+        f"P(zj>0|zi>0):   {s['p_j_given_i']:.4f}",
+        "",
+        f"E[zi]:          {s['e_i']:.3f}",
+        f"E[zj]:          {s['e_j']:.3f}",
+        f"E[zi|zi>0]:     {s['e_i_on_i']:.3f}",
+        f"E[zj|zj>0]:     {s['e_j_on_j']:.3f}",
+        f"E[zi|zj>0]:     {s['e_i_on_j']:.3f}",
+        f"E[zj|zi>0]:     {s['e_j_on_i']:.3f}",
+        f"E[zi|both]:     {s['e_i_joint']:.3f}",
+        f"E[zj|both]:     {s['e_j_joint']:.3f}",
+    ])
+
 
 # 3) One scatter per pair
 
-def plot_pairs(columns, token_ids, abs_ids): #abs_ids just takes out dict above
+def plot_pairs(columns, token_ids, abs_ids,stats): #abs_ids just takes out dict above
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     FIG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -233,7 +290,13 @@ def plot_pairs(columns, token_ids, abs_ids): #abs_ids just takes out dict above
             # a absorber token may appear in multiple places, so we create a boolean mask of size (context_size * batch_size) ~ 4.95 M, 
             # and see that at every position is the absorbed token there
 
-        fig, ax = plt.subplots(figsize=(3.8, 3.4))
+
+        fig, (ax, ax_stats) = plt.subplots(
+            1, 2,
+            figsize=(7.0, 3.4),
+            gridspec_kw={'width_ratios': [3.8, 2.8]}
+        )
+
         base = keep if red is None else keep & ~red
         ax.plot(zi[base].numpy(), zj[base].numpy(), "o", ms=0.1, alpha=0.3)
         if red is not None:
@@ -251,6 +314,22 @@ def plot_pairs(columns, token_ids, abs_ids): #abs_ids just takes out dict above
         ax.set_ylabel(f"z_{j}")
         ax.set_title(f"z_{i} vs z_{j} ({ARCH} layer {LAYER} k={SPARSITY}, "
                      f"co-act={coact})", fontsize=9)
+
+        ax_stats.axis('off')
+        ax_stats.text(
+            0.15, 0.5, stats_text(stats[i,j]),        
+            transform=ax_stats.transAxes,
+            fontsize=8,                   
+            fontfamily='monospace',
+            va='center',
+            ha='left',
+            bbox=dict(
+                boxstyle='round,pad=1',
+                facecolor='white',
+                edgecolor='gray',
+                alpha=0.9
+            )
+        )
         fig.tight_layout()
 
         out = FIG_DIR / f"zizj_scatter_{ARCH}_layer{LAYER}_k{SPARSITY}_pair{i}_{j}_{ts}.png"
@@ -258,6 +337,7 @@ def plot_pairs(columns, token_ids, abs_ids): #abs_ids just takes out dict above
         plt.close(fig)
         print(f"pair ({i}, {j}): co-active={coact} -> {out.name}")
 
+    
 
 def main():
     parser = argparse.ArgumentParser()
@@ -275,7 +355,8 @@ def main():
         if args.save:
             save_columns(columns, token_ids)
     if args.plot:
-        plot_pairs(columns, token_ids, absorbed_token_ids())
+        stats = descriptive_stats(columns)
+        plot_pairs(columns, token_ids, absorbed_token_ids(),stats)
 
 
 if __name__ == "__main__":
