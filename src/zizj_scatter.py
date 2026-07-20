@@ -206,6 +206,41 @@ def absorbed_token_ids():
         print(f"pair ({i}, {j}): {len(tokens)} absorbed tokens -> {len(ids)} ids")
     return out
 
+def letter_mask(token_ids, letter):
+    '''
+    Boolean mask over token_ids: True where the token's first letter is `letter`.
+
+    Matches the convention in the absorption_sets JSON, where ' applicable',
+    'apply' and 'Although' all sit under letter 'a': strip the leading-space
+    marker, then compare case-insensitively.
+
+    Only the distinct ids actually present get decoded, then the result is
+    broadcast back over all ~5M positions via isin.
+    '''
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b")
+    uniq = torch.unique(token_ids)
+    keep_ids = []
+    for tid in uniq.tolist():
+        s = tokenizer.decode([tid]).lstrip()
+        if s[:1].lower() == letter.lower():
+            keep_ids.append(tid)
+    mask = torch.isin(token_ids, torch.tensor(keep_ids, dtype=token_ids.dtype))
+    print(f"letter '{letter}': {len(keep_ids)} of {uniq.numel()} distinct tokens, "
+          f"{int(mask.sum()):,} of {mask.numel():,} positions")
+    return mask #returns the (unique) tokens starting with letter (here,s)
+
+def apply_letter_filter(columns, token_ids, letter):
+    """Subset every z column and the token ids down to `letter` tokens."""
+    if token_ids is None:
+        raise SystemExit(
+            "--letter needs token ids, but the loaded run has no tokens_*.pt. "
+            "Re-run with --save, or drop --letter.")
+    mask = letter_mask(token_ids, letter)
+    filtered = {}
+    for latent, z in columns.items():
+        filtered[latent] = z[mask]
+    return filtered, token_ids[mask]
+
 def descriptive_stats(columns):
     '''Per-pair descriptive metrics for the scatter panels.'''
     stats = {}
@@ -273,7 +308,7 @@ def stats_text(s): #turns stats into summary able to be plotted
 
 # 3) One scatter per pair
 
-def plot_pairs(columns, token_ids, abs_ids,stats): #abs_ids just takes out dict above
+def plot_pairs(columns, token_ids, abs_ids, stats, letter=None): #abs_ids just takes out dict above
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     FIG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -312,8 +347,9 @@ def plot_pairs(columns, token_ids, abs_ids,stats): #abs_ids just takes out dict 
         ax.axvline(0, lw=0.6, color="0.55")
         ax.set_xlabel(f"z_{i}")
         ax.set_ylabel(f"z_{j}")
+        subset = f", '{letter}'-tokens only" if letter else ""
         ax.set_title(f"z_{i} vs z_{j} ({ARCH} layer {LAYER} k={SPARSITY}, "
-                     f"co-act={coact})", fontsize=9)
+                     f"co-act={coact}{subset})", fontsize=9)
 
         ax_stats.axis('off')
         ax_stats.text(
@@ -332,7 +368,8 @@ def plot_pairs(columns, token_ids, abs_ids,stats): #abs_ids just takes out dict 
         )
         fig.tight_layout()
 
-        out = FIG_DIR / f"zizj_scatter_{ARCH}_layer{LAYER}_k{SPARSITY}_pair{i}_{j}_{ts}.png"
+        tag = f"_{letter}only" if letter else ""
+        out = FIG_DIR / f"zizj_scatter_{ARCH}_layer{LAYER}_k{SPARSITY}_pair{i}_{j}{tag}_{ts}.png"
         fig.savefig(out, dpi=160, bbox_inches="tight")
         plt.close(fig)
         print(f"pair ({i}, {j}): co-active={coact} -> {out.name}")
@@ -343,6 +380,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--save", action="store_true")
     parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--s-only", action="store_true",
+                        help="False by default")
     args = parser.parse_args()
     if not (args.save or args.plot):
         raise SystemExit("Nothing to do -- pass --save and/or --plot")
@@ -355,8 +394,12 @@ def main():
         if args.save:
             save_columns(columns, token_ids)
     if args.plot:
+        # filter after saving, so the cached .pt files always hold the full corpus
+        letter = "s" if args.s_only else None
+        if letter is not None:
+            columns, token_ids = apply_letter_filter(columns, token_ids, letter)
         stats = descriptive_stats(columns)
-        plot_pairs(columns, token_ids, absorbed_token_ids(),stats)
+        plot_pairs(columns, token_ids, absorbed_token_ids(), stats, letter)
 
 
 if __name__ == "__main__":

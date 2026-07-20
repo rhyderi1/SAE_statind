@@ -54,7 +54,7 @@ def main() -> None:
 
     for letter, grp in df.groupby("letter"):
         # grp is the sub-DataFrame of just that letter's rows (e.g. for letter="a",
-        # grp is the ~1,200 rows where letter == "a").
+        # eg: grp is the ~1,200 rows where letter == "a").
 
         # The main feature is the same for every row of a letter, so take the first one.
         s_main[letter] = [int(x) for x in grp["split_feats"].iloc[0]]
@@ -65,11 +65,14 @@ def main() -> None:
         for feat, tok in zip(absorbed_rows["top_projection_feat"], absorbed_rows["token"]):
             feat = int(feat)
             event_counts[feat] = event_counts.get(feat, 0) + 1
-            # create a dict{latent: count} where the count starts at 0.
+            # create and iterates a dict{latent: count} where the count defaults 0.
             event_tokens.setdefault(feat, []).append(str(tok))
+
         s_abs[letter] = [[feat, event_counts[feat]] for feat in sorted(event_counts)]
         # the exact vocab token of each full-absorption event, grouped by absorber
+
         s_abs_tokens[letter] = {str(feat): event_tokens[feat] for feat in sorted(event_tokens)}
+        # formatted as a dict with str keys, so it can be used by JSON
 
     text = json.dumps({
         "arch": ARCH,

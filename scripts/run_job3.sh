@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --time=0:30:00
-#SBATCH --job-name=A(j-->i)
+#SBATCH --job-name=fig6a
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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
@@ -20,4 +20,4 @@ mkdir -p logs
 
 export HF_HOME="/scratch/rhyderi1/hf_home"
 
-python src/absorption_metrics.py
+python src/chanin_fig6a.py
