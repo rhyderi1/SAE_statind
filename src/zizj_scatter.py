@@ -162,9 +162,56 @@ def load_columns():
 
 # 2) Which token ids get painted red for each pair
 
+def absorbed_token_ids_from_csv(letter):
+    '''
+    Red mask from the full-vocab rescore (src/absorption_full_vocab.py).
+
+    The absorption_sets JSON only covers the eval's 20% test split, so a latent
+    that absorbs a whole word family shows up with one or two tokens. This reads
+    the full-vocab CSV instead and keeps every full-absorption event whose
+    absorbing latent is j.
+    '''
+    import csv
+
+    pattern = f"absorption_full_{letter}_{ARCH}_layer{LAYER}_k{SPARSITY}_*.csv"
+    candidates = sorted((REPO_ROOT / "results").glob(pattern))
+    if not candidates:
+        raise SystemExit(
+            f"No {pattern} in results/ -- run src/absorption_full_vocab.py --letter {letter}")
+    print(f"Coloring absorption events from {candidates[-1]}")
+
+    by_absorber = {}   # absorbing latent -> [token, ...]
+    with open(candidates[-1], newline="") as f:
+        for row in csv.DictReader(f):
+            if row["is_full_absorption"] in ("True", "true", "1"):
+                by_absorber.setdefault(int(row["top_projection_feat"]), []).append(row["token"])
+
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b")
+    out = {}
+    for i, j in PAIRS:
+        tokens = sorted(set(by_absorber.get(j, [])))
+        if not tokens:
+            print(f"pair ({i}, {j}): latent {j} absorbs nothing -- no red")
+            continue
+        ids = []
+        for s in tokens:
+            enc = tokenizer.encode(s, add_special_tokens=False)
+            if len(enc) == 1:
+                ids.append(enc[0])
+        out[(i, j)] = {"ids": torch.tensor(sorted(ids)), "tokens": tokens}
+        print(f"pair ({i}, {j}): {len(tokens)} absorbed tokens -> {len(ids)} ids")
+    return out
+
+
 def absorbed_token_ids():
     '''
     We want to find token ids for absorption events, so we can plot it on our scatter plots (in red)
+
+    NOTE: this reads the SAEBench absorption_sets JSON, which only covers the
+    eval's 20% test split intersected with probe true positives. For a latent
+    that absorbs a word family it will find only the handful of members that
+    survived that filter -- see absorbed_token_ids_from_csv for the full-vocab
+    version.
     '''
     pattern = f"absorption_sets_{ARCH}_layer{LAYER}_k{SPARSITY}_*.json"
     # find absorption_sets dict with s_main, s_abs, # absorption events, and each token (may have mutiple absorptio occurrences)
@@ -281,6 +328,33 @@ def descriptive_stats(columns):
         }
     return stats
 
+def print_axis_tokens(columns, token_ids, axis="y", top=50):
+    '''
+    Decode the tokens sitting on one axis of the scatter.
+
+    axis='y': zi == 0 and zj > 0 (the vertical spike)
+    axis='x': zj == 0 and zi > 0
+    Prints the `top` most frequent distinct tokens per pair, with counts.
+    '''
+    if token_ids is None:
+        raise SystemExit("Need token ids -- re-run with --save so tokens_*.pt exists.")
+    tokenizer = AutoTokenizer.from_pretrained("google/gemma-2-2b")
+
+    for i, j in PAIRS:
+        zi, zj = columns[i], columns[j]
+        mask = (zi == 0) & (zj > 0) if axis == "y" else (zj == 0) & (zi > 0)
+        ids = token_ids[mask]
+        # one row per distinct token id, with how many positions it covers
+        uniq, counts = torch.unique(ids, return_counts=True)
+        order = torch.argsort(counts, descending=True)
+
+        print(f"\npair ({i}, {j}) {axis}-axis: {int(mask.sum()):,} positions, "
+              f"{uniq.numel():,} distinct tokens")
+        for k in order[:top].tolist():
+            tid = int(uniq[k])
+            print(f"  {counts[k]:>7,}  {tid:>7}  {tokenizer.decode([tid])!r}")
+
+
 def stats_text(s): #turns stats into summary able to be plotted
     return "\n".join([
         "--- Summary Stats ---",
@@ -382,24 +456,40 @@ def main():
     parser.add_argument("--plot", action="store_true")
     parser.add_argument("--s-only", action="store_true",
                         help="False by default")
+    parser.add_argument("--axis-tokens", choices=["x", "y"],
+                        help="print the tokens sitting on this axis")
+    parser.add_argument("--top", type=int, default=50,
+                        help="how many distinct tokens to print for --axis-tokens")
+    parser.add_argument("--full-vocab", action="store_true",
+                        help="red points from results/absorption_full_<letter>_*.csv "
+                             "instead of the test-split-only absorption_sets JSON")
     args = parser.parse_args()
-    if not (args.save or args.plot):
+    if not (args.save or args.plot or args.axis_tokens):
         raise SystemExit("Nothing to do -- pass --save and/or --plot")
 
     columns = token_ids = None
-    if args.plot and not args.save:
+    if (args.plot or args.axis_tokens) and not args.save:
         columns, token_ids = load_columns()
     if columns is None:
         columns, token_ids = collect_columns()
         if args.save:
             save_columns(columns, token_ids)
+
+    # filter after saving, so the cached .pt files always hold the full corpus
+    letter = "s" if args.s_only else None
+    if letter is not None and (args.plot or args.axis_tokens):
+        columns, token_ids = apply_letter_filter(columns, token_ids, letter)
+
+    if args.axis_tokens:
+        print_axis_tokens(columns, token_ids, args.axis_tokens, args.top)
+
     if args.plot:
-        # filter after saving, so the cached .pt files always hold the full corpus
-        letter = "s" if args.s_only else None
-        if letter is not None:
-            columns, token_ids = apply_letter_filter(columns, token_ids, letter)
+        if args.full_vocab:
+            abs_ids = absorbed_token_ids_from_csv(letter or "s")
+        else:
+            abs_ids = absorbed_token_ids()
         stats = descriptive_stats(columns)
-        plot_pairs(columns, token_ids, absorbed_token_ids(), stats, letter)
+        plot_pairs(columns, token_ids, abs_ids, stats, letter)
 
 
 if __name__ == "__main__":

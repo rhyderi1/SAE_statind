@@ -1,27 +1,19 @@
 #!/bin/bash
 #SBATCH --account=aip-bahtol
+#SBATCH --job-name=abs_full
 #SBATCH --cpus-per-task=32
-#SBATCH --mem=64G
-#SBATCH --time=0:10:00
 #SBATCH --gres=gpu:1
-#SBATCH --job-name=zizj_red
+#SBATCH --mem=64G
+#SBATCH --time=4:00:00
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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
 
 module load python/3.11.5
-module load gcc arrow/24.0.0
-
 source /project/aip-bahtol/rhyderi1/sae_statind/.venv/bin/activate
 
 cd /project/aip-bahtol/rhyderi1/sae_statind
 
 mkdir -p logs
 
-export HF_HOME="/scratch/rhyderi1/hf_home"
-
-python src/zizj_scatter.py \
-    --plot \
-    --s-only \
-    --axis-tokens y \
-    --full-vocab
+python src/absorption_full_vocab.py --letter s
