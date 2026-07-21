@@ -1,3 +1,13 @@
+"""Heatmaps of binarised ZTZ and of DTD x ZTZ_binary, off-diagonal.
+
+Companion to dtdxztz_heatmap.py that replaces Z^T Z with the co-activation count
+1{Z>0}^T 1{Z>0}, isolating *whether* latent pairs fire together from *how
+strongly*.
+
+LEGACY: same hardcoded single-shard path and old directory layout as
+dtdxztz_heatmap.py; writes PNGs to the working directory.
+"""
+
 import torch
 import numpy as np
 from sae_lens import SAE

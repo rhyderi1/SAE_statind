@@ -1,3 +1,14 @@
+"""Diagnostic: does b_enc exist and actually affect encode()?
+
+For each of the four SAE architectures (ReLU, TopK, JumpReLU, Matryoshka),
+checks that the encoder bias attribute is present, reports its magnitude, then
+zeroes it and measures the max change in encoded output -- distinguishing a real
+bias from a dead or all-zero one.
+
+Written to confirm which architectures need b_enc accounted for when reasoning
+about latent activation thresholds.
+"""
+
 from sae_lens import SAE
 import torch
 print("ReLU:")

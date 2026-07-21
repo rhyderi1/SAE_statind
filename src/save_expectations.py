@@ -1,3 +1,13 @@
+"""Per-latent mean activations from saved Z shards.
+
+Computes two vectors per shard -- the mean over all entries, and the mean over
+nonzero entries only (via NaN masking) -- and saves them stacked as
+1_expectation_values.pt and 1_active_expectation_values.pt.
+
+LEGACY: hardcoded shard path from an old directory layout, num_files=1, and
+outputs written to the working directory. Fed expectation_histogram.py.
+"""
+
 import torch
 
 expectation_values_list = [] #list of tensors

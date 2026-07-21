@@ -1,3 +1,13 @@
+"""Accumulate the mean Gram matrix from Z shards already on disk.
+
+G = sum_r (Z_r^T Z_r) / (B * R) over R shards of B tokens each, plus the
+unscaled Z^T Z of shard 000 alone for comparison. Outputs to
+results/gram/<timestamp>/.
+
+The 1/(B*R) scaling is what distinguishes this from the raw-count accumulation
+in compute_ind_gram.py.
+"""
+
 import os, argparse
 import torch
 from datetime import datetime

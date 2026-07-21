@@ -1,3 +1,13 @@
+"""Overlaid version of dtdxztz_scatter_full.py -- one figure per (layer, arch).
+
+Same quantities and same 3x2 grid, but sparsity levels are grouped and drawn on
+shared axes in different colours instead of getting a figure each, so the effect
+of L0 on the DTD/ZTZ relationship is visible in a single panel.
+
+Reads config/params.csv, writes figures plus spearman_summary.csv to
+figures/scatterplots_1shard/dtdxztz_scatter_full_overlay/<timestamp>/.
+"""
+
 import os, glob, csv
 from collections import defaultdict
 import numpy as np

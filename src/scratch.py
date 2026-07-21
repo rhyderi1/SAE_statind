@@ -1,3 +1,11 @@
+"""Scratch pad: shape and decoder-norm checks on a Z shard.
+
+Prints Z and W_dec shapes and the min/max decoder column norms.
+
+LEGACY: hardcoded shard path from an old directory layout. Not part of any
+pipeline.
+"""
+
 import torch
 from sae_lens import SAE
 

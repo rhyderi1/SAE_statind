@@ -1,3 +1,25 @@
+"""Stage 1 of the pipeline: stream the corpus and save SAE activations to disk.
+
+Loads gemma-2-2b under TransformerLens, hooks the residual stream at
+blocks.{layer}.hook_resid_post, encodes each batch with the selected SAE, and
+writes X (residual, d_model) and/or Z (SAE latents, d_sae) as Z_shard{NNN}.pt
+files of ~shard_size token positions each.
+
+SAE_DATA is the registry mapping (layer, arch, sparsity) -> (release, sae_id);
+most other scripts in this repo import it from here.
+
+Run one config directly, or a whole sweep via --task_id as a SLURM array index
+into config/params.csv:
+
+    python src/infer_z.py --modelchoice gemma-2-2b --layer 12 --arch relu \
+        --sparsity 20 --store_z
+    sbatch scripts/run_inferz.sh        # array 0-19, one row of params.csv each
+
+NOTE: --out_dir defaults to figures/infer_z_test/..., but the downstream
+scatter scripts glob for shards under data/Z/*/acts_layer{L}_{arch}_{sp}_*.
+Pass --out_dir explicitly to match that layout.
+"""
+
 import os
 import torch
 from sae_lens import SAE

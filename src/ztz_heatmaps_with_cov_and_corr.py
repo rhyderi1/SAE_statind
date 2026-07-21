@@ -1,3 +1,14 @@
+"""Per-shard Gram, covariance, and correlation heatmaps.
+
+For each of the first 10 shards, mean-centres Z and renders three matrices:
+the centred Gram G, the covariance C = G/(n-1), and the correlation R. Together
+they separate raw co-activation magnitude from scale-free dependence between
+latents.
+
+LEGACY: hardcoded shard path from an old directory layout; writes PNGs to the
+working directory.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

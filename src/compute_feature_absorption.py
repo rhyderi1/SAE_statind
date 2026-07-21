@@ -1,3 +1,17 @@
+"""Run SAEBench's feature-absorption eval over a list of SAEs.
+
+Thin driver around sae_bench.evals.absorption: builds an AbsorptionEvalConfig,
+runs the eval on the SAEs in `selected_saes`, and writes one
+<release>_<sae_id>_eval_results.json per SAE into eval_results/absorption/,
+printing each SAE's absorption rate (lower = less absorption = better).
+
+The eval also drops per-SAE parquet artifacts inside the installed sae_bench
+package tree; extract_absorption_sets.py reads those to build S_main/S_abs.
+
+First run downloads the model and SAEs and takes 30-60+ minutes. force_rerun is
+currently True, so cached results are ignored.
+"""
+
 import json
 import os
 import time

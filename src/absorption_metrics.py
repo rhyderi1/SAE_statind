@@ -1,3 +1,21 @@
+"""Absorption Metric 3 for hand-picked (main, absorber) latent pairs.
+
+Streams the corpus once, tracking per-pair firing counts and activation sums,
+then reports
+
+    metric = (E[z_i | i fires] - E[z_i | i and j fire]) / E[z_i | i fires]
+             * P(j fires | i fires)
+
+i.e. how much latent i's activation is suppressed when j co-fires, weighted by
+how often that co-firing happens. Large values indicate j absorbs i.
+
+latent_pairs holds the top absorption pairs from the absorption_sets JSON plus
+control pairs that reuse the same absorber j against a different letter's main
+latent i, so the metric can be compared against a matched baseline.
+
+Config (arch/layer/sparsity, pair list) is hardcoded at the top of the file.
+"""
+
 import argparse
 import matplotlib
 matplotlib.use('Agg')

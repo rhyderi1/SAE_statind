@@ -1,3 +1,13 @@
+"""Train a vanilla SAE on gemma-2-2b layer 12 with SAELens.
+
+Standalone SAELens training run (d_in=2304, d_sae=16384, L1 penalty, 30k steps
+on openwebtext), checkpointing to checkpoints/.
+
+Not part of the analysis pipeline -- all reported results use pretrained SAEs
+from the SAE_DATA registry in infer_z.py. Kept as a reference for how a
+locally-trained SAE would be produced.
+"""
+
 import torch
 import os
 

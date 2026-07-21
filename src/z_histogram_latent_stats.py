@@ -1,3 +1,17 @@
+"""Per-latent activation statistics for one config.
+
+Same streaming setup as z_histogram.py, but instead of pooling all activations
+it accumulates per-latent running totals and produces three figures: the
+distribution of per-latent mean activation, the distribution of per-latent max
+activation, and max vs mean as a scatter.
+
+Everything is kept as fixed-size (p,) accumulators, so memory does not grow with
+the number of batches. The active-only mean is computed but currently commented
+out.
+
+Config is hardcoded at the top (layer 12, relu, k=20).
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

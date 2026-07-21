@@ -1,3 +1,21 @@
+"""Single-pass ZTZ and indicator-Gram accumulation, straight from the corpus.
+
+Same streaming setup as infer_z.py, but instead of writing Z shards to disk it
+accumulates two p x p matrices on the fly and saves only those:
+
+    ztz_layer{L}_{arch}_k{sp}.pt        G      = sum over batches of Z^T Z
+    zindtzind_layer{L}_{arch}_k{sp}.pt  G_ind  = sum of 1{Z!=0}^T 1{Z!=0}
+
+Use this when the Gram matrices are all that's needed -- it avoids the hundreds
+of GB of Z shards that infer_z.py produces. Outputs land in
+data/pile-10k-saes/layer{L}_{arch}_k{sp}/.
+
+Reads config/params2.csv by default (not params.csv).
+
+NOTE: carries its own copy of SAE_DATA rather than importing it from infer_z,
+so the two registries can drift apart.
+"""
+
 import os
 import torch
 from sae_lens import SAE

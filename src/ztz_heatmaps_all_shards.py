@@ -1,3 +1,12 @@
+"""ZTZ heatmaps for one shard and for the full shard set.
+
+Renders the raw Gram of shard 000, then accumulates Z^T Z / (n*p) across 93
+shards and renders that, saving both the .pt matrices and the heatmaps.
+
+LEGACY: hardcoded shard path and shard count from an old directory layout;
+the accumulation logic now lives in compute_gram_from_Z.py.
+"""
+
 import torch
 import numpy as np
 from datetime import datetime

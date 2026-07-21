@@ -1,3 +1,9 @@
+"""Diagnostic: assert that ZTZ and DTD come out symmetric.
+
+Sanity check on a precomputed Gram matrix and on the decoder Gram D D^T. Prints
+a line per matrix that passes and stays silent on failure.
+"""
+
 import torch
 import numpy as np
 from sae_lens import SAE

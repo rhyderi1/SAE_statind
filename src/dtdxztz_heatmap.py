@@ -1,3 +1,14 @@
+"""Heatmap of the element-wise product DTD x ZTZ, off-diagonal.
+
+Early exploratory script: loads a single Z shard, forms both Gram matrices,
+blanks the diagonals, and renders their product as a seaborn heatmap clipped to
+the 1st-99th percentile.
+
+LEGACY: reads a hardcoded shard path ('1_acts_layer12_relu_20_.../Z_shard000.pt')
+from an old directory layout that no longer exists, and writes the PNG to the
+working directory. Superseded by the dtdxztz_scatter_* scripts.
+"""
+
 # we want to plot a graph of DTD vs ZTZ (off diagonal)
 import torch
 import matplotlib.pyplot as plt

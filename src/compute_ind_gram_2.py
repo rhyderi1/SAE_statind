@@ -1,3 +1,13 @@
+"""Scaled variant of compute_ind_gram.py.
+
+Identical accumulation of the binary co-activation matrix ind^T ind over Z
+shards, except each shard's contribution is divided by (B * R) to give a mean
+rather than a raw count, and it runs in float32 instead of float64.
+
+Use compute_ind_gram.py when raw co-activation counts are wanted; use this one
+when the scale needs to match compute_gram_from_Z.py.
+"""
+
 import os, argparse
 import torch
 from datetime import datetime

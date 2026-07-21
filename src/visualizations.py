@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+"""Exploratory notebook export: Z distributions plus Gram heatmaps.
+
+Combines what later became z_histogram.py (activation and per-latent mean
+histograms) and ztz_heatmaps_all_shards.py (single-shard and accumulated Gram
+heatmaps) in one linear script, exported from visualizations.ipynb.
+
+LEGACY: hardcoded shard paths from an old directory layout, and the heatmap
+section silently reloads a *different* shard than the histogram section above
+it. Superseded by the individual scripts.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

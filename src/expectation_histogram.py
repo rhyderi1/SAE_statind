@@ -1,3 +1,12 @@
+"""Histograms of the per-latent mean activations saved by save_expectations.py.
+
+Plots the distribution of all-entry means and of active-entry means (dropping
+NaNs from latents that never fired).
+
+LEGACY: reads and writes bare filenames in the working directory; pairs with
+save_expectations.py.
+"""
+
 import torch
 import matplotlib.pyplot as plt
 

@@ -1,3 +1,13 @@
+"""Minimal single-config DTD vs ZTZ scatter.
+
+Loads one precomputed ZTZ matrix (from compute_gram_from_tokens.py) and the
+SAE's decoder, then scatters raw d_i^T d_j against z_i^T z_j for the
+lower-triangular pairs that actually co-activated.
+
+Config is hardcoded at the top of the file (layer 12, relu, k=20) rather than
+read from params.csv -- edit the constants to point it elsewhere.
+"""
+
 import os
 
 from sae_lens.saes import SAE

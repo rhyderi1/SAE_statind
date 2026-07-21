@@ -1,3 +1,11 @@
+"""Standalone copy of the (layer, arch, sparsity) -> (release, sae_id) registry.
+
+UNUSED: every script in this repo imports SAE_DATA from infer_z.py instead, and
+this copy omits the layer 3 entries that the absorption work depends on. Kept
+only so the registry can be read without importing infer_z's heavy dependencies.
+Prefer `from infer_z import SAE_DATA`.
+"""
+
 SAE_DATA = {
     12: {
         "relu": {

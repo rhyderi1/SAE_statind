@@ -1,3 +1,16 @@
+"""Histogram of all SAE activation values for one config.
+
+Streams the corpus, collects every nonzero activation, bins them on a log-count
+axis, and folds the (very large) number of exact zeros back into bin 0 so the
+plot represents all entries rather than just the active ones.
+
+Config is hardcoded at the top (layer 12, relu, k=20).
+
+BROKEN: `max_val` is used on the np.histogram call but its definition is
+commented out, so this raises NameError as written. Restore the
+`max_val = Z_final.max() ...` line before running.
+"""
+
 import torch
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,3 +1,17 @@
+"""DTD vs ZTZ scatter grid -- one 3x2 figure per SAE config.
+
+For every row of config/params.csv, streams that config's Z shards into ZtZ and
+the co-activation count matrix, samples up to MAX_POINTS off-diagonal latent
+pairs, and plots three decoder-geometry y-quantities against two x-quantities:
+
+    y: z_i^T z_j  |  z_i^T z_j / co-activation count  |  co-activation count
+    x: d_i^T d_j  |  cosine(d_i, d_j)
+
+Dead latents (never active in the corpus) are dropped first. Also writes
+spearman_summary.csv with rank correlations per config. Output goes to
+figures/dtdxztz_scatter_full/<timestamp>/.
+"""
+
 import os, glob, csv
 import numpy as np
 import torch
