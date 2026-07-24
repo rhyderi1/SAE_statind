@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --account=aip-bahtol
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
+#SBATCH --mem=16G
 #SBATCH --gres=gpu:1
-#SBATCH --time=1:00:00
+#SBATCH --time=0:30:00
 #SBATCH --job-name=abs_sets
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
@@ -20,4 +20,4 @@ mkdir -p logs
 
 export HF_HOME="/scratch/rhyderi1/hf_home"
 
-python src/extract_absorption_sets.py 
+python src/check_batch_ceiling.py 

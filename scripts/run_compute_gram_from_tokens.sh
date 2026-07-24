@@ -1,8 +1,9 @@
 #!/bin/bash
 #SBATCH --account=aip-bahtol
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
-#SBATCH --time=24:00:00
+#SBATCH --time=5:00:00
 #SBATCH --job-name=run_compute_gram_from_tokens
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
@@ -23,7 +24,7 @@ export HF_TOKEN=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
 python src/compute_gram_from_tokens.py \
     --modelchoice gemma-2-2b \
     --dtypechoice float32 \
-    --n_batches 1209 \
+    --n_batches 3823 \
     --batch_size 32 \
     --context_size 128 \
     --shard_size 50000 \

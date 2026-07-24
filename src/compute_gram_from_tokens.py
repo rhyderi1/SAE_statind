@@ -10,10 +10,7 @@ Use this when the Gram matrices are all that's needed -- it avoids the hundreds
 of GB of Z shards that infer_z.py produces. Outputs land in
 data/pile-10k-saes/layer{L}_{arch}_k{sp}/.
 
-Reads config/params2.csv by default (not params.csv).
-
-NOTE: carries its own copy of SAE_DATA rather than importing it from infer_z,
-so the two registries can drift apart.
+Reads config/params.csv by default.
 """
 
 import os
@@ -34,49 +31,7 @@ import seaborn as sns
 import csv
 import time
 
-SAE_DATA = {
-    12: {
-        "relu": {
-            "20": ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_0"),
-            "40": ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_1"),
-            "80": ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_2"),
-        },
-        "topk": {
-            "20": ("sae_bench_gemma-2-2b_topk_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_0"),
-            "40": ("sae_bench_gemma-2-2b_topk_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_1"),
-            "80": ("sae_bench_gemma-2-2b_topk_width-2pow14_date-1109", "blocks.12.hook_resid_post__trainer_2"),
-        },
-        "jumprelu": {
-            "22": ("gemma-scope-2b-pt-res", "layer_12/width_16k/average_l0_22"),
-            "41": ("gemma-scope-2b-pt-res", "layer_12/width_16k/average_l0_41"),
-            "82": ("gemma-scope-2b-pt-res-canonical", "layer_12/width_16k/average_l0_82"),
-        },
-        "matryoshka": {
-            "40": ("gemma-2-2b-res-matryoshka-dc", "blocks.12.hook_resid_post"),
-        },
-    },
-    19: {
-        "relu": {
-            "20": ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.19.hook_resid_post__trainer_0"),
-            "40": ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.19.hook_resid_post__trainer_1"),
-            "80": ("sae_bench_gemma-2-2b_vanilla_width-2pow14_date-1109", "blocks.19.hook_resid_post__trainer_2"),
-        },
-        "topk": {
-            "20": ("sae_bench_gemma-2-2b_topk_width-2pow14_date-1109", "blocks.19.hook_resid_post__trainer_0"),
-            "40": ("sae_bench_gemma-2-2b_topk_width-2pow14_date-1109", "blocks.19.hook_resid_post__trainer_1"),
-            "80": ("sae_bench_gemma-2-2b_topk_width-2pow14_date-1109", "blocks.19.hook_resid_post__trainer_2"),
-        },
-    
-        "jumprelu": {
-            "23":        ("gemma-scope-2b-pt-res", "layer_19/width_16k/average_l0_23"),
-            "40":       ("gemma-scope-2b-pt-res", "layer_19/width_16k/average_l0_40"),
-            "73": ("gemma-scope-2b-pt-res", "layer_19/width_16k/average_l0_73"),
-        },
-        "matryoshka": {
-            "40": ("gemma-2-2b-res-matryoshka-dc", "blocks.19.hook_resid_post"),
-        },
-    },
-}
+from infer_z import SAE_DATA
 
 def read_config(task_id, file_path):
     """Reads the config row for the given task ID ."""
@@ -91,8 +46,8 @@ def read_config(task_id, file_path):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_id",    type=int, default=None)
-    parser.add_argument("--config_csv", type=str, default="config/params2.csv")
-    parser.add_argument("--layer",    type=int, choices=[12, 19])
+    parser.add_argument("--config_csv", type=str, default="config/params.csv")
+    parser.add_argument("--layer",    type=int, choices=[3, 12, 19])
     parser.add_argument("--arch",     type=str, choices=["relu","topk","batchtopk","jumprelu","matryoshka"])
     parser.add_argument("--sparsity", type=str)
     parser.add_argument("--modelchoice",  type=str, required=True, choices=["gemma-2-2b"])
@@ -143,8 +98,15 @@ def collect_and_save_gram(layer,
         # graph from intermediate activations, since backward() function will not be called
         for batch_idx in range(n_batches): # looping, per batch
 
-            # (from activation_store) get fixed-length batch of tokens 
-            batch_tokens = activation_store.get_batch_tokens(batch_size)
+            # (from activation_store) get fixed-length batch of tokens
+            try:
+                batch_tokens = activation_store.get_batch_tokens(
+                    batch_size, raise_at_epoch_end=True
+                )
+            except StopIteration:
+                print(f"  Dataset exhausted after {batch_idx} batches "
+                      f"({batch_idx * batch_size} windows); stopping.")
+                break
             # shape: (batch_size, context_size)
 
             _, cache = model.run_with_cache( # the core: actually obtaining the model's intenal activations
@@ -164,19 +126,19 @@ def collect_and_save_gram(layer,
             Z_flat = Z.reshape(-1, Z.shape[-1]).to(dtype=save_dtype)
             _, p = Z_flat.shape
             if G is None:
-                G = torch.zeros(p, p)
+                G = torch.zeros(p, p, device=Z_flat.device, dtype=save_dtype)
             ZTZ = Z_flat.T @ Z_flat
             G += ZTZ
 
-            ####### get ZindTZind
-            Z_ind_flat=(Z_flat != 0).float()
-            ZindTZind = Z_ind_flat.T @ Z_ind_flat
-            if G_ind is None:
-                G_ind = torch.zeros(p, p)
-            G_ind += ZindTZind
-            if (batch_idx + 1) % 50 == 0:
-                print(f"  batch {batch_idx + 1}/{n_batches}")
-            #break  # for debugging, only run one batch
+            # ####### get ZindTZind
+            # Z_ind_flat=(Z_flat != 0).float()
+            # ZindTZind = Z_ind_flat.T @ Z_ind_flat
+            # if G_ind is None:
+            #     G_ind = torch.zeros(p, p, device=Z_flat.device, dtype=save_dtype)
+            # G_ind += ZindTZind
+            # if (batch_idx + 1) % 50 == 0:
+            #     print(f"  batch {batch_idx + 1}/{n_batches}")
+            # #break  # for debugging, only run one batch
 
     # flush any remaining tokens
 
@@ -184,8 +146,8 @@ def collect_and_save_gram(layer,
     ind_gram_nancount = torch.isnan(G_ind).sum().item()
     print(f"\nGram matrix has {gram_nancount} NaNs, ZindTZind has {ind_gram_nancount} NaNs")
     print(f"\nDone. Shards written to {out_dir}/")
-    torch.save(G, os.path.join(out_dir, f"ztz_layer{layer}_{arch}_k{sparsity}.pt"))
-    torch.save(G_ind, os.path.join(out_dir, f"zindtzind_layer{layer}_{arch}_k{sparsity}.pt"))
+    torch.save(G.cpu(), os.path.join(out_dir, f"ztz_layer{layer}_{arch}_k{sparsity}.pt"))
+    # torch.save(G_ind.cpu(), os.path.join(out_dir, f"zindtzind_layer{layer}_{arch}_k{sparsity}.pt"))
 
 
 def main():
@@ -203,7 +165,7 @@ def main():
         raise SystemExit("Provide --task_id, or all of --layer/--arch/--sparsity")
 
     if args.out_dir is None:
-        args.out_dir = f"data/pile-10k-saes/layer{args.layer}_{args.arch}_k{args.sparsity}"
+        args.out_dir = f"data/pile-10k-saes/gram_layer{args.layer}_{args.arch}_l0{args.sparsity}"
 
     dtype_map = {"float16": torch.float16, "float32": torch.float32}
     save_dtype = dtype_map[args.dtypechoice]
@@ -218,8 +180,7 @@ def main():
 
     print(f"\nBuilding ActivationsStore (dataset='{args.dataset}', "
           f"context_size={args.context_size}) ...")
-    activation_store = ActivationsStore.from_sae(# from_sae initializes an ActivationsStore class (with the necessary parameters)(here, called activation_store)  
-        model,
+    activation_store = ActivationsStore.from_sae(
         sae,
         context_size=args.context_size,
         dataset=args.dataset,

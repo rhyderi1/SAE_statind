@@ -2,7 +2,7 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=64G
+#SBATCH --mem=16G
 #SBATCH --time=0:30:00
 #SBATCH --job-name=fig6a
 #SBATCH --output=logs/%x-%j.out
@@ -20,4 +20,4 @@ mkdir -p logs
 
 export HF_HOME="/scratch/rhyderi1/hf_home"
 
-python src/chanin_fig6a.py
+python src/check_tokens.py

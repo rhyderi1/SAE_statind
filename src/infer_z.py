@@ -15,9 +15,11 @@ into config/params.csv:
         --sparsity 20 --store_z
     sbatch scripts/run_inferz.sh        # array 0-19, one row of params.csv each
 
-NOTE: --out_dir defaults to figures/infer_z_test/..., but the downstream
-scatter scripts glob for shards under data/Z/*/acts_layer{L}_{arch}_{sp}_*.
-Pass --out_dir explicitly to match that layout.
+Output layout (matches the downstream scatter scripts, which glob
+data/Z/*/acts_layer{L}_{arch}_{sp}_*):
+  X shards -> data/X/layer{L}/X_shard{NNN}.pt
+  Z shards -> data/Z/All batches/acts_layer{L}_{arch}_{sparsity}_{ts}/Z_shard{NNN}.pt
+--out_dir, if given, overrides the Z directory only.
 """
 
 import os
@@ -104,7 +106,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--task_id",    type=int, default=None)
     parser.add_argument("--config_csv", type=str, default="config/params.csv")
-    parser.add_argument("--layer",    type=int, choices=[12, 19])
+    parser.add_argument("--layer",    type=int, choices=[3, 12, 19])
     parser.add_argument("--arch",     type=str, choices=["relu","topk","batchtopk","jumprelu","matryoshka"])
     parser.add_argument("--sparsity", type=str)
     parser.add_argument("--modelchoice",  type=str, required=True, choices=["gemma-2-2b"])
@@ -132,15 +134,15 @@ def get_sae(layer, arch, sparsity, device: str) -> SAE: # returns an object of c
     return sae.to(device).eval() # move to GPU, turns to evaluation mode (no dropout, batchnorm)
 
 
-def _save_shard(all_X, all_Z, out_dir, shard_idx, store_x, store_z):
+def _save_shard(all_X, all_Z, x_dir, z_dir, shard_idx, store_x, store_z):
     if store_x and all_X:
         X_cat = torch.cat(all_X, dim=0) # concatenates the list of tensors (13 tensors for 13 batches, where each batch is (4096,2304)) into 1 tensor with dimension (53k, 2304)
-        x_path = os.path.join(out_dir, f"X_shard{shard_idx:03d}.pt")
+        x_path = os.path.join(x_dir, f"X_shard{shard_idx:03d}.pt")
         torch.save(X_cat, x_path)
         print(f"  Saved {x_path}  {tuple(X_cat.shape)}")
     if store_z and all_Z:
         Z_cat = torch.cat(all_Z, dim=0) # concatenates the list of tensors (13 tensors for 13 batches, where each batch is (4096,16k)) into 1 tensor with dimension (53k, 16k)
-        z_path = os.path.join(out_dir, f"Z_shard{shard_idx:03d}.pt")
+        z_path = os.path.join(z_dir, f"Z_shard{shard_idx:03d}.pt")
         torch.save(Z_cat, z_path)
         print(f"  Saved {z_path}  {tuple(Z_cat.shape)}")
     if store_z:
@@ -148,11 +150,14 @@ def _save_shard(all_X, all_Z, out_dir, shard_idx, store_x, store_z):
 
 def collect_and_save_sharded(layer,
     model, sae, activation_store,
-    out_dir, n_batches, batch_size, shard_size,
+    x_dir, z_dir, n_batches, batch_size, shard_size,
     save_dtype, store_x, store_z,plot,arch,sparsity
 ):
- 
-    os.makedirs(out_dir, exist_ok=True) #creates output folder if it doesn't exist
+
+    if store_x:
+        os.makedirs(x_dir, exist_ok=True) # X shards -> data/X/layer{L}/
+    if store_z:
+        os.makedirs(z_dir, exist_ok=True) # Z shards -> data/Z/All batches/{name}/
 
     hook_name     = f"blocks.{layer}.hook_resid_post" # where hooked transformer should intercept: layer, and location (res, mlp, att)
 
@@ -202,8 +207,8 @@ def collect_and_save_sharded(layer,
             # flush shard when full 
             if tokens_in_buf >= shard_size:
                 if store_z:
-                    z_path = os.path.join(out_dir, f"Z_shard{shard_idx:03d}.pt")
-                _save_shard(all_X, all_Z, out_dir, shard_idx, store_x, store_z)
+                    z_path = os.path.join(z_dir, f"Z_shard{shard_idx:03d}.pt")
+                _save_shard(all_X, all_Z, x_dir, z_dir, shard_idx, store_x, store_z)
                 all_X, all_Z  = [], []
                 tokens_in_buf = 0
                 shard_idx    += 1
@@ -220,10 +225,13 @@ def collect_and_save_sharded(layer,
 
     # flush any remaining tokens
     if all_X or all_Z:
-        _save_shard(all_X, all_Z, out_dir, shard_idx, store_x, store_z)
+        _save_shard(all_X, all_Z, x_dir, z_dir, shard_idx, store_x, store_z)
 
     total = (shard_idx + 1) * shard_size  # approximate
-    print(f"\nDone. Shards written to {out_dir}/")
+    if store_x:
+        print(f"\nDone. X shards written to {x_dir}/")
+    if store_z:
+        print(f"Done. Z shards written to {z_dir}/")
 
 
 def main():
@@ -240,9 +248,11 @@ def main():
     if args.layer is None or args.arch is None or args.sparsity is None:
         raise SystemExit("Provide --task_id, or all of --layer/--arch/--sparsity")
 
-    if args.out_dir is None:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.out_dir = f"figures/infer_z_test/layer{args.layer}_{args.arch}_l0{args.sparsity}_{ts}"
+    # X shards -> data/X/layer{L}/ ; Z shards -> data/Z/All batches/{name}/
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    name = f"acts_layer{args.layer}_{args.arch}_{args.sparsity}_{ts}"
+    args.x_dir = f"data/X/layer{args.layer}"
+    args.z_dir = args.out_dir if args.out_dir is not None else f"data/Z/All batches/{name}"
 
     if not args.store_x and not args.store_z: # if we don't choose to save X, Z --> warning
         raise SystemExit("Nothing to save — pass --store_x and/or --store_z")
@@ -274,7 +284,8 @@ def main():
         model=model,
         sae = sae, 
         activation_store = activation_store,
-        out_dir     = args.out_dir,
+        x_dir       = args.x_dir,
+        z_dir       = args.z_dir,
         n_batches   = args.n_batches,
         batch_size  = args.batch_size,
         shard_size  = args.shard_size,
