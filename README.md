@@ -1,4 +1,4 @@
-# SAE_Statind ReadMe
+# SAE_Statind ReadME
 This github repo is roughly organized into 4 working folders. Note that some parts are a work in progress.
 ### 1. src/
 This is where all the code is (.py mostly)
