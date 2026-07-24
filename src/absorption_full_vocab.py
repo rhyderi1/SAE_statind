@@ -60,9 +60,9 @@ from sae_bench.evals.absorption.vocab import LETTERS, get_alpha_tokens
 from infer_z import SAE_DATA
 
 MODEL_NAME = "gemma-2-2b"
-ARCH = "jumprelu"
-LAYER = 3
-SPARSITY = "59"
+ARCH = "relu"
+LAYER = 12
+SPARSITY = "20"
 
 # eval defaults, from AbsorptionEvalConfig -- keep in sync or the numbers stop
 # being comparable to the parquet
@@ -75,11 +75,7 @@ RESULTS_DIR = REPO_ROOT / "results"
 
 
 def load_s_main(letter):
-    """S_main latents for `letter`, from the newest absorption_sets JSON.
-
-    Reusing the JSON rather than recomputing feature splits from the metrics
-    parquet keeps this script and zizj_scatter.py pointed at the same latents.
-    """
+'''get S_main tokens from absorption dict'''
     pattern = f"absorption_sets_{ARCH}_layer{LAYER}_k{SPARSITY}_*.json"
     candidates = sorted(RESULTS_DIR.glob(pattern))
     if not candidates:
@@ -94,8 +90,6 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--letter", default="s")
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--limit", type=int,
-                        help="score only the first N words (smoke test)")
     args = parser.parse_args()
 
     letter = args.letter.lower()
@@ -107,11 +101,18 @@ def main():
     release, sae_id = SAE_DATA[LAYER][ARCH][SPARSITY]
 
     model = HookedTransformer.from_pretrained_no_processing(
-        MODEL_NAME, device=device, dtype=dtype)
-    sae = SAE.from_pretrained(release=release, sae_id=sae_id, device=device)
-    if isinstance(sae, tuple):          # older sae_lens returns (sae, cfg, sparsity)
-        sae = sae[0]
-    sae = sae.to(device=device, dtype=dtype)
+        MODEL_NAME, 
+        device=device, 
+        dtype=dtype
+        )
+
+    sae = SAE.from_pretrained(
+        release=release, 
+        sae_id=sae_id, 
+        device=device
+        )
+
+    sae = sae.to(device=device, dtype=dtype) # Move to GPU
 
     # the probe is vocab-split-independent: it was trained once per layer and is
     # reused verbatim, so nothing here retrains or reshuffles anything
@@ -120,8 +121,7 @@ def main():
 
     vocab = get_alpha_tokens(model.tokenizer)
     words = sorted(w for w in vocab if w.lstrip()[:1].lower() == letter)
-    if args.limit:
-        words = words[:args.limit]
+   
     print(f"letter '{letter}': scoring {len(words):,} of {len(vocab):,} alpha tokens")
 
     main_feature_ids = load_s_main(letter)
@@ -173,7 +173,7 @@ def main():
     print(f"\n{len(df):,} tokens scored, {n_full:,} full-absorption events -> {out.name}")
     print("\ntop absorbing latents:")
     print(df[df["is_full_absorption"]]["top_projection_feat"]
-          .value_counts().head(15).to_string())
+          .value_counts().head(15).to_string()) 
 
 
 if __name__ == "__main__":

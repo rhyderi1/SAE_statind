@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --gres=gpu:1
 #SBATCH --mem=64G
-#SBATCH --time=4:00:00
+#SBATCH --time=0:30:00
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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

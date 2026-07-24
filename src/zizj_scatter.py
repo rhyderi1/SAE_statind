@@ -31,14 +31,16 @@ context_size = 128
 batch_size = 32
 n_batches = 1209
 
-ARCH = "jumprelu"
-LAYER = 3
-SPARSITY = "59"
+ARCH = "relu"
+LAYER = 12
+SPARSITY = "20"
 SAE_RELEASE = "gemma-scope-2b-pt-res"
 SAE_ID = "layer_3/width_16k/average_l0_59"   # the paper's exact checkpoint (L0=59)
 
 PAIRS = [
-    (6510, 1085)
+    (477, 10069),
+    (7985,3645),
+    (4014,622)
 ]
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -454,15 +456,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--save", action="store_true")
     parser.add_argument("--plot", action="store_true")
-    parser.add_argument("--s-only", action="store_true",
-                        help="False by default")
-    parser.add_argument("--axis-tokens", choices=["x", "y"],
-                        help="print the tokens sitting on this axis")
-    parser.add_argument("--top", type=int, default=50,
-                        help="how many distinct tokens to print for --axis-tokens")
-    parser.add_argument("--full-vocab", action="store_true",
-                        help="red points from results/absorption_full_<letter>_*.csv "
-                             "instead of the test-split-only absorption_sets JSON")
+    parser.add_argument("--s-only", action="store_true")
+    parser.add_argument("--axis-tokens", choices=["x", "y"])
+    parser.add_argument("--top", type=int, default=50)# prints top 50 axis latents
+    parser.add_argument("--full-vocab", action="store_true")# takes custom csv with all data
     args = parser.parse_args()
     if not (args.save or args.plot or args.axis_tokens):
         raise SystemExit("Nothing to do -- pass --save and/or --plot")
