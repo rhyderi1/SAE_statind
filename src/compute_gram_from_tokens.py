@@ -181,7 +181,8 @@ def main():
     print(f"\nBuilding ActivationsStore (dataset='{args.dataset}', "
           f"context_size={args.context_size}) ...")
     activation_store = ActivationsStore.from_sae(
-        sae,
+        model=model,
+        sae=sae,
         context_size=args.context_size,
         dataset=args.dataset,
     )

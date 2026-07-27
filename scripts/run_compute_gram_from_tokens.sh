@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
 #SBATCH --time=5:00:00
-#SBATCH --job-name=run_compute_gram_from_tokens
+#SBATCH --job-name=cmput_gram
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 
