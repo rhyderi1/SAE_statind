@@ -142,9 +142,8 @@ def collect_and_save_gram(layer,
 
     # flush any remaining tokens
 
-    gram_nancount = torch.isnan(G).sum().item()
-    ind_gram_nancount = torch.isnan(G_ind).sum().item()
-    print(f"\nGram matrix has {gram_nancount} NaNs, ZindTZind has {ind_gram_nancount} NaNs")
+    #gram_nancount = torch.isnan(G).sum().item()
+    #print(f"\nGram matrix has {gram_nancount} NaNs")
     print(f"\nDone. Shards written to {out_dir}/")
     torch.save(G.cpu(), os.path.join(out_dir, f"ztz_layer{layer}_{arch}_k{sparsity}.pt"))
     # torch.save(G_ind.cpu(), os.path.join(out_dir, f"zindtzind_layer{layer}_{arch}_k{sparsity}.pt"))

@@ -2,8 +2,8 @@
 #SBATCH --account=aip-bahtol
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=16
-#SBATCH --mem=32G
-#SBATCH --time=8:00:00
+#SBATCH --mem=64G
+#SBATCH --time=0:30:00
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 export HF_TOKEN=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
@@ -15,4 +15,4 @@ cd /project/aip-bahtol/rhyderi1/sae_statind
 
 mkdir -p logs
 
-python src/z_hist_latent_stats_other.py
+python src/sorted_lineplots.py
