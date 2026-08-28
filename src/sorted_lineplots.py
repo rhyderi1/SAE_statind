@@ -141,6 +141,35 @@ zizj_and_coords = zizj_and_coords.cpu().numpy()
 x = list(range(1, len(max_z) + 1))
 x_zizj_full = list(range(1, len(zizj_and_coords) + 1))
 
+# Latents to call out as a visible red dot. For the per-latent stats each
+# latent is highlighted individually; for zizj the single pair is highlighted.
+HIGHLIGHT_LATENTS = [1085, 6510]
+HIGHLIGHT_PAIR = (min(HIGHLIGHT_LATENTS), max(HIGHLIGHT_LATENTS))
+
+
+def _latent_hits(idx_arr, y_vals, latents):
+    """Return (xs, ys, labels) for the sorted-rank positions of `latents`."""
+    idx_arr = np.asarray(idx_arr)
+    xs, ys, labels = [], [], []
+    for L in latents:
+        pos = np.where(idx_arr == L)[0]
+        if len(pos):
+            r = int(pos[0])
+            xs.append(r + 1)
+            ys.append(y_vals[r])
+            labels.append(f"latent {L}")
+    return xs, ys, labels
+
+
+def _pair_hit(coords_arr, y_vals, pair):
+    """Return (xs, ys, labels) for the sorted-rank position of `pair`."""
+    i, j = pair
+    match = np.where((coords_arr[:, 1] == i) & (coords_arr[:, 2] == j))[0]
+    if len(match):
+        r = int(match[0])
+        return [r + 1], [y_vals[r]], [f"pair ({i}, {j})"]
+    return [], [], []
+
 # All points -- too big for an interactive HTML page, so render the full
 # set for each stat as a static PNG instead.
 png_path = (
@@ -158,15 +187,25 @@ png_plots = [
     (x_zizj_full, zizj_and_coords[:, 0], "Sorted zizj (all pairs)"),
 ]
 
+# Index arrays parallel to png_plots; None marks the zizj (pair) plot.
+png_highlight_idx = [max_idxs, min_indxs, mean_indxs, std_indxs, None]
+
 fig_png, axes_png = plt.subplots(2, 3, figsize=(15, 10))
 axes_png = axes_png.flatten()
-for ax, (px_vals, py_vals, title) in zip(axes_png, png_plots):
+for ax, (px_vals, py_vals, title), idx_arr in zip(axes_png, png_plots, png_highlight_idx):
     ax.scatter(px_vals, py_vals, s=1, marker=".")
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel("Sorted rank")
     ax.set_ylabel(title)
     ax.set_title(title)
+    if idx_arr is None:
+        hx, hy, _ = _pair_hit(zizj_and_coords, py_vals, HIGHLIGHT_PAIR)
+    else:
+        hx, hy, _ = _latent_hits(idx_arr, py_vals, HIGHLIGHT_LATENTS)
+    if hx:
+        ax.scatter(hx, hy, s=40, c="red", marker="o", zorder=5,
+                   edgecolors="black", linewidths=0.5)
 axes_png[-1].axis("off")
 fig_png.tight_layout()
 fig_png.savefig(png_path, dpi=150)
@@ -243,6 +282,34 @@ fig.add_trace(
     ),
     row=2, col=2
 )
+
+# Overlay the highlighted latents as visible red dots on each subplot.
+_html_highlights = [
+    (1, 1, _latent_hits(max_idxs, max_z, HIGHLIGHT_LATENTS)),
+    (1, 2, _latent_hits(min_indxs, min_z, HIGHLIGHT_LATENTS)),
+    (1, 3, _latent_hits(mean_indxs, mean, HIGHLIGHT_LATENTS)),
+    (2, 1, _latent_hits(std_indxs, std_dev, HIGHLIGHT_LATENTS)),
+    (2, 2, _pair_hit(zizj_and_coords, zizj_and_coords[:, 0], HIGHLIGHT_PAIR)),
+]
+for r, c, (hx, hy, labels) in _html_highlights:
+    if not hx:
+        continue
+    fig.add_trace(
+        go.Scatter(
+            x=hx, y=hy,
+            mode="markers",
+            marker=dict(symbol="circle", size=12, color="red",
+                        line=dict(width=1, color="black")),
+            text=labels,
+            hovertemplate="x: %{x}<br>y: %{y}<br>%{text}<extra></extra>",
+            name="highlight",
+            showlegend=(r == 1 and c == 1),
+        ),
+        row=r, col=c,
+    )
+if not _html_highlights[-1][2][0]:
+    print(f"Note: pair {HIGHLIGHT_PAIR} is outside the top {TOP_K} zizj values; "
+          "no red dot on the interactive zizj subplot.")
 
 out_path = (
     REPO_ROOT
