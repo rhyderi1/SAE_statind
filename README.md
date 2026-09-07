@@ -4,7 +4,7 @@ Project TLDR: We want to generalize the feature absorption pathology (introduced
 This github repo is roughly organized into 4 working folders. Note that some parts are a work in progress.
 ### 1. src/
 This is where all the code is (.py mostly)
-I've tried to include a brief description of each file at the beginning as a docstring. Work in progress. 
+I've tried to include a brief description of each file at the beginning as a docstring (may be AI generated). Work in progress. 
 ### 2. scripts/
 Shell scripts to run source code in src/ via sbatch. Includes job_name, output directory, GPU #, GPU memory, CPU number, job time, etc...
 ### 3. figures/
