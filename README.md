@@ -1,5 +1,6 @@
 # SAE_Statind ReadME
 Project TLDR: We want to generalize the feature absorption pathology (introduced in Chanin et al., 2025) to modalities beyond language. Specifically, we want to be able to derive an absorption metric that requires minimal data assumptions. 
+
 This github repo is roughly organized into 4 working folders. Note that some parts are a work in progress.
 ### 1. src/
 This is where all the code is (.py mostly)
