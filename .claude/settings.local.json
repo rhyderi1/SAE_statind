@@ -74,7 +74,10 @@
       "Bash(echo \"== exit $? ==\")",
       "Bash(awk '/\"s_abs\"/,0' results/absorption_sets_relu_layer12_k20_20260703_110221.json)",
       "Bash(awk '/^    \"s\": \\\\[/,/^    \\\\],?$/')",
-      "Bash(bash /tmp/claude-1000/-home-razah-vulcan-sae-statind/e558f107-8381-4622-bf4b-853762df0012/scratchpad/reorg_figures.sh)"
+      "Bash(bash /tmp/claude-1000/-home-razah-vulcan-sae-statind/e558f107-8381-4622-bf4b-853762df0012/scratchpad/reorg_figures.sh)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('src/sorted_lineplots.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(echo \"\\(exit $?\\)\")",
+      "Bash(python3 -)"
     ]
   }
 }
